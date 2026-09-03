@@ -200,12 +200,25 @@ if (MeshDevice && TransportWebBluetooth) {
   log('no working CDN found. local bundling with pnpm + vite is the fix.');
 }
 
+let readyDone = false;
+function markReady() {
+  if (readyDone) return;
+  readyDone = true;
+  setLink('connected', 'up');
+  btnConn.textContent = 'Connected';
+  btnConn.disabled = true;
+  cmdBtns.forEach(b => b.disabled = false);
+  freqNote.textContent = 'connected — press Query';
+  log('ready — try Query', true);
+}
+
 // ---- connect ---------------------------------------------------------
 btnConn.addEventListener('click', async () => {
   if (!MeshDevice) { log('no library, cannot connect'); return; }
   if (device) { log('already connected'); return; }
 
   try {
+    readyDone = false;
     setLink('pairing…');
     log('requesting device…');
 
@@ -218,17 +231,31 @@ btnConn.addEventListener('click', async () => {
       handleReply(String(text));
     });
 
+    // 1 restarting, 2 disconnected, 3 connecting, 4 reconnecting,
+    // 5 connected, 6 configuring, 7 configured
     if (device.events.onDeviceStatus) {
-      device.events.onDeviceStatus.subscribe(s => log('status: ' + s));
+      device.events.onDeviceStatus.subscribe(st => {
+        const names = {1:'restarting',2:'disconnected',3:'connecting',
+                       4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
+        log('status ' + st + ' (' + (names[st] || '?') + ')');
+
+        if (st === 5 || st === 7) markReady();
+        if (st === 2) {
+          setLink('disconnected', 'down');
+          btnConn.disabled = false;
+          btnConn.textContent = 'Reconnect';
+          cmdBtns.forEach(b => b.disabled = true);
+          device = null;
+        }
+      });
     }
 
-    await device.configure();
+    // configure() signals completion through the status event, not the
+    // promise, so do not await it or the UI never unlocks.
+    device.configure().catch(e => log('configure: ' + String(e)));
 
-    setLink('connected', 'up');
-    btnConn.textContent = 'Connected';
-    btnConn.disabled = true;
-    cmdBtns.forEach(b => b.disabled = false);
-    log('connected — try Query', true);
+    // safety net if the status event never fires
+    setTimeout(() => { if (device) markReady(); }, 6000);
   } catch (e) {
     setLink('failed', 'down');
     log('connect failed: ' + String(e));
@@ -286,3 +313,4 @@ function handleReply(raw) {
 
 </body>
 </html>
+
