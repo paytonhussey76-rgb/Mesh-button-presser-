@@ -147,16 +147,18 @@ let pendingTimer = null;
 let MeshDevice, TransportWebBluetooth;
 
 const CORE_URLS = [
-  'https://esm.sh/@meshtastic/core',
-  'https://esm.sh/jsr/@meshtastic/core',
   'https://cdn.jsdelivr.net/npm/@meshtastic/core/+esm',
-  'https://esm.run/@meshtastic/core'
+  'https://esm.run/@meshtastic/core',
+  'https://esm.sh/@meshtastic/core?bundle&target=es2022',
+  'https://esm.sh/jsr/@meshtastic/core',
+  'https://esm.sh/@meshtastic/core'
 ];
 const TRANSPORT_URLS = [
-  'https://esm.sh/@meshtastic/transport-web-bluetooth',
-  'https://esm.sh/jsr/@meshtastic/transport-web-bluetooth',
   'https://cdn.jsdelivr.net/npm/@meshtastic/transport-web-bluetooth/+esm',
-  'https://esm.run/@meshtastic/transport-web-bluetooth'
+  'https://esm.run/@meshtastic/transport-web-bluetooth',
+  'https://esm.sh/@meshtastic/transport-web-bluetooth?bundle&target=es2022',
+  'https://esm.sh/jsr/@meshtastic/transport-web-bluetooth',
+  'https://esm.sh/@meshtastic/transport-web-bluetooth'
 ];
 
 async function tryImport(urls, exportName) {
