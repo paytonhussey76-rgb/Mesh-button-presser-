@@ -218,6 +218,7 @@ async function send(cmd) {
     log('send failed: ' + String(e));
   }
 }
+  
 
 cmdBtns.forEach(b => b.addEventListener('click', () => send(b.dataset.cmd)));
 
