@@ -152,7 +152,7 @@ let pendingTimer = null;
 // --- load the library -------------------------------------------------
 let Meshtastic;
 try {
-  Meshtastic = await import('https://esm.sh/@meshtastic/js@2.3.1');
+  Meshtastic = await import('https://cdn.jsdelivr.net/npm/@meshtastic/js@2.3.1/+esm');
   log('library loaded', true);
 } catch (e) {
   log('could not load @meshtastic/js from CDN:');
