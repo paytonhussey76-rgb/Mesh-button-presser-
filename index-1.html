@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12100e">
+<title>Loc3 Remote</title>
+<style>
+  :root {
+    --ink: #12100e;
+    --panel: #1e1b17;
+    --edge: #332e27;
+    --wheat: #e8dfd0;
+    --dim: #8a8177;
+    --amber: #d99b2b;
+    --signal: #4a8f6f;
+    --alert: #b8452f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ink);
+    color: var(--wheat);
+    font: 500 17px/1.4 ui-sans-serif, system-ui, sans-serif;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--edge);
+    padding-bottom: 8px;
+  }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  #link { font-size: 13px; color: var(--dim); }
+  #link.up { color: var(--signal); }
+  #link.down { color: var(--alert); }
+
+  #freq {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  #freq .val {
+    display: block;
+    font-size: 40px;
+    font-weight: 650;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  #freq .note { display: block; margin-top: 6px; font-size: 13px; color: var(--dim); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button {
+    font: inherit;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--wheat);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    min-height: 62px;
+    padding: 8px;
+  }
+  button:active { background: #2a251f; }
+  button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  button:disabled { opacity: 0.35; }
+  button.wide { grid-column: 1 / -1; }
+  button.power { border-color: var(--alert); color: #e8a08f; }
+  button.connect { border-color: var(--amber); color: #f0c675; }
+
+  #log {
+    flex: 1;
+    min-height: 90px;
+    overflow-y: auto;
+    background: #0c0a09;
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: 400 13px/1.5 ui-monospace, monospace;
+    color: var(--dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #log b { color: var(--wheat); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Loc3-5Tx</h1>
+  <span id="link">not connected</span>
+</header>
+
+<div id="freq">
+  <span class="val" id="freqVal">&mdash;</span>
+  <span class="note" id="freqNote">connect, then press Query</span>
+</div>
+
+<button class="connect wide" id="btnConnect">Connect over Bluetooth</button>
+
+<div class="grid" id="controls">
+  <button data-cmd="G1" disabled>Slot 1</button>
+  <button data-cmd="G2" disabled>Slot 2</button>
+  <button data-cmd="G3" disabled>Slot 3</button>
+  <button data-cmd="G4" disabled>Slot 4</button>
+  <button data-cmd="G5" disabled>Slot 5</button>
+  <button data-cmd="G6" disabled>Slot 6</button>
+  <button data-cmd="U1" disabled>Output +</button>
+  <button data-cmd="D1" disabled>Output &minus;</button>
+  <button data-cmd="F1" disabled>Step freq</button>
+  <button data-cmd="Q" disabled>Query</button>
+  <button class="power wide" data-cmd="P" disabled>Power &mdash; hold 2s</button>
+</div>
+
+<div id="log">ready. tap connect.</div>
+
+<script type="module">
+const logEl    = document.getElementById('log');
+const linkEl   = document.getElementById('link');
+const freqVal  = document.getElementById('freqVal');
+const freqNote = document.getElementById('freqNote');
+const btnConn  = document.getElementById('btnConnect');
+const cmdBtns  = [...document.querySelectorAll('#controls button')];
+
+function log(msg, strong) {
+  const t = new Date().toLocaleTimeString([], { hour12: false });
+  logEl.innerHTML += `\n${t}  ` + (strong ? `<b>${msg}</b>` : msg);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setLink(text, cls) {
+  linkEl.textContent = text;
+  linkEl.className = cls || '';
+}
+
+let device = null;
+let pending = null;
+let pendingTimer = null;
+
+// ---- load library ----------------------------------------------------
+let MeshDevice, TransportWebBluetooth;
+try {
+  const core = await import('https://esm.sh/@meshtastic/core@2.6.7');
+  const tw   = await import('https://esm.sh/@meshtastic/transport-web-bluetooth@0.1.2');
+  MeshDevice = core.MeshDevice;
+  TransportWebBluetooth = tw.TransportWebBluetooth;
+  if (!MeshDevice || !TransportWebBluetooth) throw new Error('exports missing');
+  log('library loaded', true);
+} catch (e) {
+  log('library failed to load:');
+  log(String(e));
+  log('CDN likely cannot resolve the @buf protobuf dependency. bundling locally is the fix.');
+}
+
+// ---- connect ---------------------------------------------------------
+btnConn.addEventListener('click', async () => {
+  if (!MeshDevice) { log('no library, cannot connect'); return; }
+  if (device) { log('already connected'); return; }
+
+  try {
+    setLink('pairing…');
+    log('requesting device…');
+
+    const transport = await TransportWebBluetooth.create();
+    device = new MeshDevice(transport);
+
+    device.events.onMessagePacket.subscribe(p => {
+      const text = p?.data ?? p?.payload ?? '';
+      log('rx: ' + text);
+      handleReply(String(text));
+    });
+
+    if (device.events.onDeviceStatus) {
+      device.events.onDeviceStatus.subscribe(s => log('status: ' + s));
+    }
+
+    await device.configure();
+
+    setLink('connected', 'up');
+    btnConn.textContent = 'Connected';
+    btnConn.disabled = true;
+    cmdBtns.forEach(b => b.disabled = false);
+    log('connected — try Query', true);
+  } catch (e) {
+    setLink('failed', 'down');
+    log('connect failed: ' + String(e));
+    device = null;
+  }
+});
+
+// ---- send ------------------------------------------------------------
+async function send(cmd) {
+  if (!device) { log('not connected'); return; }
+  try {
+    log('tx: ' + cmd, true);
+    pending = cmd;
+    freqNote.textContent = 'sent ' + cmd + ' — waiting for reply';
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => {
+      if (pending) {
+        freqNote.textContent = 'no reply to ' + pending + ' — out of range?';
+        setLink('no reply', 'down');
+        log('timeout waiting for ' + pending);
+        pending = null;
+      }
+    }, 25000);
+
+    await device.sendText(cmd);
+  } catch (e) {
+    log('send failed: ' + String(e));
+  }
+}
+cmdBtns.forEach(b => b.addEventListener('click', () => send(b.dataset.cmd)));
+
+// ---- parse replies ---------------------------------------------------
+function handleReply(raw) {
+  let s = raw.trim();
+  const colon = s.indexOf(':');
+  if (colon >= 0 && colon < 8) s = s.slice(colon + 1).trim();
+  if (!s.startsWith('>')) return;
+  s = s.slice(1).trim();
+
+  clearTimeout(pendingTimer);
+  pending = null;
+  setLink('connected', 'up');
+
+  if (s.startsWith('NOW ') || s.startsWith('SYNC ')) {
+    freqVal.textContent = s.replace(/^(NOW|SYNC)\s+/, '');
+    freqNote.textContent = 'confirmed by transmitter';
+  } else if (s.startsWith('OK')) {
+    freqNote.textContent = s.toLowerCase() + ' — confirmed';
+  } else if (s.startsWith('ERR')) {
+    freqNote.textContent = s.toLowerCase();
+    setLink('error', 'down');
+  }
+}
+</script>
+
+</body>
+</html>
