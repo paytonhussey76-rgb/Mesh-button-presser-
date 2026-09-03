@@ -120,6 +120,14 @@
 
 <div id="log">ready. tap connect.</div>
 
+<script type="importmap">
+{
+  "imports": {
+    "https://esm.sh/node/util.mjs": "./util-shim.js"
+  }
+}
+</script>
+
 <script type="module">
 const logEl    = document.getElementById('log');
 const linkEl   = document.getElementById('link');
@@ -179,48 +187,6 @@ async function tryImport(urls, exportName) {
   }
   return null;
 }
-
-// esm.sh shims Node built-ins with unenv, whose util.types.isNativeError
-// throws instead of working. Import that shim first and repair it — module
-// caching means @meshtastic/core then receives the patched copy.
-async function patchNodeUtil() {
-  const shims = [
-    'https://esm.sh/node/util.mjs',
-    'https://esm.sh/node/util.js'
-  ];
-  for (const url of shims) {
-    try {
-      const mod = await import(url);
-      const targets = [mod, mod.default].filter(Boolean);
-      let patched = false;
-      for (const t of targets) {
-        if (t && typeof t === 'object' && t.types) {
-          try {
-            t.types.isNativeError = (e) =>
-              e instanceof Error ||
-              Object.prototype.toString.call(e) === '[object Error]';
-            if (!t.types.isAsyncFunction) {
-              t.types.isAsyncFunction = (f) =>
-                typeof f === 'function' && f.constructor?.name === 'AsyncFunction';
-            }
-            patched = true;
-          } catch (inner) {
-            log('   types object is frozen: ' + String(inner).slice(0, 80));
-          }
-        }
-      }
-      if (patched) { log('patched node util shim', true); return true; }
-      log('loaded ' + url + ' but found no types object');
-    } catch (e) {
-      log('shim not at ' + url);
-    }
-  }
-  log('could not patch node util shim — connect may still fail');
-  return false;
-}
-
-log('patching node shims…');
-await patchNodeUtil();
 
 log('loading core…');
 MeshDevice = await tryImport(CORE_URLS, 'MeshDevice');
