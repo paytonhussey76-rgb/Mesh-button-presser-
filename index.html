@@ -417,7 +417,16 @@ if (MeshDevice && TransportWebBluetooth) {
 }
 
 // ---- connect ---------------------------------------------------------
+// The BLE link often reports a brief disconnect during setup and then
+// recovers a second later. Treat a drop as real only if nothing comes
+// back within DROP_GRACE, otherwise every connect looks like a failure.
+const DROP_GRACE = 4000;
+let dropTimer = null;
+
 function markReady() {
+  clearTimeout(dropTimer);
+  dropTimer = null;
+  if (!device) return;          // nothing behind the UI, ignore
   if (readyDone) return;
   readyDone = true;
   connected = true;
@@ -429,14 +438,33 @@ function markReady() {
   render();
 }
 
+function noteFlap() {
+  if (dropTimer) return;
+  log('link dropped — waiting to see if it recovers');
+  setLink('unstable', 'down');
+  dropTimer = setTimeout(() => {
+    dropTimer = null;
+    markDropped();
+  }, DROP_GRACE);
+}
+
 function markDropped() {
+  clearTimeout(dropTimer);
+  dropTimer = null;
   connected = false;
   readyDone = false;
+
+  if (device) {
+    try {
+      if (typeof device.disconnect === 'function') device.disconnect();
+    } catch (e) { /* transport may already be gone */ }
+  }
   device = null;
+
   setLink('disconnected', 'down');
   btnConn.disabled = false;
   btnConn.textContent = 'Reconnect';
-  setNote('Bluetooth link dropped. Tap reconnect.', 'err');
+  setNote('Bluetooth link dropped. Force-stop the Meshtastic app, then reconnect.', 'err');
   render();
 }
 
@@ -446,6 +474,8 @@ btnConn.addEventListener('click', async () => {
 
   try {
     readyDone = false;
+    clearTimeout(dropTimer);
+    dropTimer = null;
     setLink('pairing…');
     setNote('Pick the transmitter node from the Bluetooth list.');
     log('requesting device…');
@@ -467,7 +497,7 @@ btnConn.addEventListener('click', async () => {
                        4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
         log('status ' + st + ' (' + (names[st] || '?') + ')');
         if (st === 5 || st === 7) markReady();
-        if (st === 2) markDropped();
+        if (st === 2) noteFlap();
       });
     }
 
