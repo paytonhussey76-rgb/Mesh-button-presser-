@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Loc3-5Tx Remote</title>
+
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0E0D0C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Loc3">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" href="./icon-192.png">
+
+<style>
+  :root {
+    --body:      #0E0D0C;
+    --panel:     #1A1917;
+    --panel-hi:  #24221F;
+    --edge:      #333029;
+    --hivis:     #F5C518;
+    --key-red:   #C8382B;
+    --key-amber: #E8A317;
+    --key-slate: #6E8BA8;
+    --ink:       #F0EBE0;
+    --mute:      #7A736A;
+    --good:      #6FAE7F;
+    --bad:       #D2544A;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    margin: 0 auto;
+    min-height: 100%;
+    max-width: 520px;
+    background: var(--body);
+    color: var(--ink);
+    font: 500 16px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ---- status strip ---- */
+  .strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--mute);
+  }
+  .strip .name { color: var(--ink); font-weight: 650; letter-spacing: -0.01em; }
+  .link { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }
+  .link.up { color: var(--good); }
+  .link.up .dot { background: var(--good); }
+  .link.down { color: var(--bad); }
+  .link.down .dot { background: var(--bad); }
+
+  /* ---- readout: the hero ---- */
+  .readout {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--hivis);
+    border-radius: 4px;
+    padding: 16px 16px 14px;
+  }
+  .freq {
+    display: block;
+    font-size: 42px;
+    font-weight: 680;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .freq.unknown { color: var(--mute); font-weight: 500; font-size: 26px; }
+  .state {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+    color: var(--mute);
+  }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .lamp {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #3A362F; border: 1px solid #4A453C;
+  }
+  .pill.on { color: var(--ink); }
+  .pill.on .lamp { background: var(--key-red); border-color: var(--key-red); }
+  .note {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--mute);
+    min-height: 18px;
+  }
+  .note.warn { color: var(--key-amber); }
+  .note.err  { color: var(--bad); }
+
+  /* ---- buttons ---- */
+  button {
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    min-height: 56px;
+    padding: 8px 10px;
+    transition: background 90ms linear;
+  }
+  button:active:not(:disabled) { background: var(--panel-hi); }
+  button:focus-visible { outline: 2px solid var(--hivis); outline-offset: 2px; }
+  button:disabled { opacity: 0.28; }
+
+  .connect {
+    width: 100%;
+    min-height: 52px;
+    border-color: var(--hivis);
+    color: var(--hivis);
+  }
+
+  .power {
+    width: 100%;
+    min-height: 64px;
+    font-size: 18px;
+    border-color: var(--key-red);
+    color: #F0A99F;
+  }
+  .power.is-on { background: #2A1614; }
+
+  .mark {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    min-height: 0;
+    padding: 4px;
+    background: none;
+    border: none;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--mute);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ---- sections ---- */
+  .block { display: flex; flex-direction: column; gap: 8px; }
+  .block h2 {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--mute);
+  }
+  .block.locked { opacity: 0.34; pointer-events: none; }
+
+  .freqgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .freqgrid button {
+    border-left: 3px solid var(--key-slate);
+    font-variant-numeric: tabular-nums;
+  }
+  .freqgrid button.active {
+    background: var(--panel-hi);
+    border-color: var(--hivis);
+    color: var(--hivis);
+  }
+  .next { width: 100%; border-left: 3px solid var(--key-slate); }
+
+  /* ---- output row ---- */
+  .outrow {
+    display: grid;
+    grid-template-columns: 76px 1fr 76px;
+    gap: 8px;
+  }
+  .outrow button {
+    font-size: 24px;
+    border-color: var(--key-amber);
+    color: var(--key-amber);
+  }
+  .bars {
+    min-height: 64px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 7px;
+    padding: 12px 10px;
+  }
+  .bars i {
+    display: block;
+    width: 13px;
+    background: #322E28;
+    border-radius: 1.5px;
+  }
+  .bars i.lit { background: var(--key-amber); }
+  .bars i:nth-child(1) { height: 22%; }
+  .bars i:nth-child(2) { height: 41%; }
+  .bars i:nth-child(3) { height: 60%; }
+  .bars i:nth-child(4) { height: 80%; }
+  .bars i:nth-child(5) { height: 100%; }
+
+  /* ---- log ---- */
+  details {
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    background: #0A0908;
+  }
+  summary { padding: 10px 12px; font-size: 13px; color: var(--mute); cursor: pointer; }
+  #log {
+    max-height: 190px;
+    overflow-y: auto;
+    padding: 0 12px 12px;
+    font: 400 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--mute);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #log b { color: var(--ink); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="strip">
+  <span class="name">Loc3-5Tx</span>
+  <span class="link" id="link"><span class="dot"></span><span id="linkText">not connected</span></span>
+</div>
+
+<div class="readout">
+  <span class="freq unknown" id="freqVal">frequency unknown</span>
+  <div class="state">
+    <span class="pill" id="pwrPill"><span class="lamp"></span><span id="pwrText">off</span></span>
+    <span id="outText">output 1</span>
+  </div>
+  <div class="note" id="note">Loading radio library…</div>
+</div>
+
+<button class="connect" id="btnConnect">Connect over Bluetooth</button>
+
+<div class="block" id="powerBlock">
+  <button class="power" id="btnPower" disabled>Turn transmitter on</button>
+  <button class="mark" id="btnMark" disabled>It&rsquo;s already on &mdash; don&rsquo;t send anything</button>
+</div>
+
+<div class="block locked" id="freqBlock">
+  <h2>Frequency</h2>
+  <div class="freqgrid" id="freqGrid"></div>
+  <button class="next" id="btnNext">Next frequency</button>
+</div>
+
+<div class="block locked" id="outBlock">
+  <h2>Output level</h2>
+  <div class="outrow">
+    <button id="btnDown">&minus;</button>
+    <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+    <button id="btnUp">&plus;</button>
+  </div>
+</div>
+
+<details>
+  <summary>Activity log</summary>
+  <div id="log">ready.</div>
+</details>
+
+<script type="importmap">
+{
+  "imports": {
+    "https://esm.sh/node/util.mjs": "./util-shim.js"
+  }
+}
+</script>
+
+<script type="module">
+// ======================================================================
+// These must match the FREQS[] array in the C3 firmware, same order.
+// G1 is index 0.
+// ======================================================================
+const FREQS = ["9.82kHz","32.8kHz","65.5kHz","83.1kHz","200kHz","SD-USA","512Hz","8.19kHz"];
+const OUT_MIN = 1;
+const OUT_MAX = 5;
+
+const logEl    = document.getElementById('log');
+const linkEl   = document.getElementById('link');
+const linkText = document.getElementById('linkText');
+const freqVal  = document.getElementById('freqVal');
+const noteEl   = document.getElementById('note');
+const pwrPill  = document.getElementById('pwrPill');
+const pwrText  = document.getElementById('pwrText');
+const outText  = document.getElementById('outText');
+const barsEl   = document.getElementById('bars');
+
+const btnConn  = document.getElementById('btnConnect');
+const btnPower = document.getElementById('btnPower');
+const btnMark  = document.getElementById('btnMark');
+const btnNext  = document.getElementById('btnNext');
+const btnUp    = document.getElementById('btnUp');
+const btnDown  = document.getElementById('btnDown');
+
+const freqBlock = document.getElementById('freqBlock');
+const outBlock  = document.getElementById('outBlock');
+const freqGrid  = document.getElementById('freqGrid');
+
+let device       = null;
+let connected    = false;
+let powerOn      = false;
+let outLevel     = 1;
+let freqIndex    = null;
+let pending      = null;
+let pendingTimer = null;
+let readyDone    = false;
+
+function log(msg, strong) {
+  const t = new Date().toLocaleTimeString([], { hour12: false });
+  logEl.innerHTML += `\n${t}  ` + (strong ? `<b>${msg}</b>` : msg);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setLink(text, cls) {
+  linkText.textContent = text;
+  linkEl.className = 'link' + (cls ? ' ' + cls : '');
+}
+function setNote(text, kind) {
+  noteEl.textContent = text;
+  noteEl.className = 'note' + (kind ? ' ' + kind : '');
+}
+
+FREQS.forEach((name, i) => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.addEventListener('click', () => send('G' + (i + 1)));
+  freqGrid.appendChild(b);
+});
+const freqButtons = [...freqGrid.querySelectorAll('button')];
+
+function render() {
+  if (freqIndex === null) {
+    freqVal.textContent = 'frequency unknown';
+    freqVal.className = 'freq unknown';
+  } else {
+    freqVal.textContent = FREQS[freqIndex];
+    freqVal.className = 'freq';
+  }
+  freqButtons.forEach((b, i) => b.classList.toggle('active', i === freqIndex));
+
+  pwrPill.className = 'pill' + (powerOn ? ' on' : '');
+  pwrText.textContent = powerOn ? 'on' : 'off';
+  btnPower.textContent = powerOn ? 'Turn transmitter off' : 'Turn transmitter on';
+  btnPower.classList.toggle('is-on', powerOn);
+  btnMark.textContent = powerOn
+    ? "It's actually off — don't send anything"
+    : "It's already on — don't send anything";
+
+  outText.textContent = 'output ' + outLevel;
+  [...barsEl.children].forEach((bar, i) => bar.classList.toggle('lit', i < outLevel));
+
+  const live = connected && powerOn;
+  btnPower.disabled = !connected;
+  btnMark.disabled  = !connected;
+  btnUp.disabled    = !live || outLevel >= OUT_MAX;
+  btnDown.disabled  = !live || outLevel <= OUT_MIN;
+  freqBlock.classList.toggle('locked', !live);
+  outBlock.classList.toggle('locked', !live);
+}
+
+// ---- library ---------------------------------------------------------
+let MeshDevice, TransportWebBluetooth;
+
+const CORE_URLS = [
+  'https://esm.sh/@meshtastic/core?bundle&target=es2022',
+  'https://esm.sh/@meshtastic/core',
+  'https://cdn.jsdelivr.net/npm/@meshtastic/core/+esm'
+];
+const TRANSPORT_URLS = [
+  'https://esm.sh/@meshtastic/transport-web-bluetooth?bundle&target=es2022',
+  'https://esm.sh/@meshtastic/transport-web-bluetooth',
+  'https://cdn.jsdelivr.net/npm/@meshtastic/transport-web-bluetooth/+esm'
+];
+
+async function tryImport(urls, exportName) {
+  for (const url of urls) {
+    try {
+      const mod = await import(url);
+      const found = mod[exportName] ?? mod.default?.[exportName];
+      if (found) { log('ok: ' + url, true); return found; }
+      log('loaded but no ' + exportName + ' in ' + url);
+    } catch (e) {
+      log('fail: ' + url);
+      log('   ' + String(e).slice(0, 120));
+    }
+  }
+  return null;
+}
+
+log('loading core…');
+MeshDevice = await tryImport(CORE_URLS, 'MeshDevice');
+log('loading bluetooth transport…');
+TransportWebBluetooth = await tryImport(TRANSPORT_URLS, 'TransportWebBluetooth');
+
+if (MeshDevice && TransportWebBluetooth) {
+  log('library ready', true);
+  setNote('Ready. Tap connect.');
+} else {
+  log('no working source found for the radio library');
+  setNote('Radio library failed to load. Open the activity log for detail.', 'err');
+  btnConn.disabled = true;
+}
+
+// ---- connect ---------------------------------------------------------
+function markReady() {
+  if (readyDone) return;
+  readyDone = true;
+  connected = true;
+  setLink('connected', 'up');
+  btnConn.textContent = 'Connected';
+  btnConn.disabled = true;
+  setNote('Connected. Turn the transmitter on, or mark it as already on.');
+  log('ready', true);
+  render();
+}
+
+function markDropped() {
+  connected = false;
+  readyDone = false;
+  device = null;
+  setLink('disconnected', 'down');
+  btnConn.disabled = false;
+  btnConn.textContent = 'Reconnect';
+  setNote('Bluetooth link dropped. Tap reconnect.', 'err');
+  render();
+}
+
+btnConn.addEventListener('click', async () => {
+  if (!MeshDevice) { log('no library, cannot connect'); return; }
+  if (device) { log('already connected'); return; }
+
+  try {
+    readyDone = false;
+    setLink('pairing…');
+    setNote('Pick the transmitter node from the Bluetooth list.');
+    log('requesting device…');
+
+    const transport = await TransportWebBluetooth.create();
+    device = new MeshDevice(transport);
+
+    device.events.onMessagePacket.subscribe(p => {
+      const text = p?.data ?? p?.payload ?? '';
+      log('rx: ' + text);
+      handleReply(String(text));
+    });
+
+    // 1 restarting, 2 disconnected, 3 connecting, 4 reconnecting,
+    // 5 connected, 6 configuring, 7 configured
+    if (device.events.onDeviceStatus) {
+      device.events.onDeviceStatus.subscribe(st => {
+        const names = {1:'restarting',2:'disconnected',3:'connecting',
+                       4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
+        log('status ' + st + ' (' + (names[st] || '?') + ')');
+        if (st === 5 || st === 7) markReady();
+        if (st === 2) markDropped();
+      });
+    }
+
+    // configure() reports completion through the status event rather than
+    // resolving its promise, so awaiting it would leave the UI locked.
+    device.configure().catch(e => log('configure: ' + String(e)));
+    setTimeout(() => { if (device) markReady(); }, 6000);
+  } catch (e) {
+    setLink('failed', 'down');
+    setNote('Could not connect. Force-stop the Meshtastic app, then retry.', 'err');
+    log('connect failed: ' + String(e));
+    device = null;
+    render();
+  }
+});
+
+// ---- sending ---------------------------------------------------------
+async function send(cmd) {
+  if (!device) { log('not connected'); return; }
+  try {
+    log('tx: ' + cmd, true);
+    pending = cmd;
+    setNote('Sent ' + cmd + '. Waiting for the transmitter to confirm…');
+
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => {
+      if (pending) {
+        setNote('No reply to ' + pending + '. Out of range, or the box lost power.', 'warn');
+        setLink('no reply', 'down');
+        log('timeout waiting for ' + pending);
+        pending = null;
+      }
+    }, 25000);
+
+    await device.sendText(cmd);
+  } catch (e) {
+    log('send failed: ' + String(e));
+    setNote('Send failed: ' + String(e).slice(0, 70), 'err');
+  }
+}
+
+btnPower.addEventListener('click', () => send('P'));
+btnNext.addEventListener('click',  () => send('F1'));
+btnUp.addEventListener('click',    () => { if (outLevel < OUT_MAX) send('U1'); });
+btnDown.addEventListener('click',  () => { if (outLevel > OUT_MIN) send('D1'); });
+
+// The transmitter can't report whether it is powered, so this corrects
+// the assumption without pressing anything on the keypad.
+btnMark.addEventListener('click', () => {
+  powerOn = !powerOn;
+  setNote(powerOn ? 'Marked as on. Nothing was sent.'
+                  : 'Marked as off. Nothing was sent.');
+  log('manual state: power ' + (powerOn ? 'on' : 'off'));
+  render();
+});
+
+// ---- replies ---------------------------------------------------------
+function handleReply(raw) {
+  let s = String(raw).trim();
+  const colon = s.indexOf(':');
+  if (colon >= 0 && colon < 8) s = s.slice(colon + 1).trim();
+  if (!s.startsWith('>')) return;
+  s = s.slice(1).trim();
+
+  const answered = pending;
+  clearTimeout(pendingTimer);
+  pending = null;
+  setLink('connected', 'up');
+
+  if (/^(NOW|SYNC)\s+/i.test(s)) {
+    const name = s.replace(/^(NOW|SYNC)\s+/i, '').trim();
+    const idx = FREQS.findIndex(f => f.toLowerCase() === name.toLowerCase());
+    freqIndex = idx >= 0 ? idx : null;
+    if (idx >= 0) {
+      setNote('Now on ' + FREQS[idx] + '.');
+    } else {
+      log('device reported an unlisted frequency: ' + name);
+      setNote('Transmitter reported ' + name + ', which is not in the list.', 'warn');
+    }
+
+  } else if (/^OK\s+out\+/i.test(s)) {
+    outLevel = Math.min(OUT_MAX, outLevel + 1);
+    setNote('Output raised to ' + outLevel + '.');
+
+  } else if (/^OK\s+out-/i.test(s)) {
+    outLevel = Math.max(OUT_MIN, outLevel - 1);
+    setNote('Output lowered to ' + outLevel + '.');
+
+  } else if (/^OK\s+power/i.test(s)) {
+    powerOn = !powerOn;
+    if (powerOn) {
+      setNote('Transmitter powered on.');
+    } else {
+      freqIndex = null;
+      setNote('Transmitter powered off.');
+    }
+
+  } else if (/^ERR/i.test(s)) {
+    setNote('Transmitter rejected ' + (answered || 'the command') + ': ' + s.slice(3).trim(), 'err');
+
+  } else {
+    setNote(s);
+  }
+
+  render();
+}
+
+// ---- offline support -------------------------------------------------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => log('offline support installed'))
+      .catch(e => log('service worker failed: ' + String(e).slice(0, 80)));
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
