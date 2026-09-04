@@ -323,6 +323,16 @@ let readyDone    = false;
 let busy         = false;
 let lastSent     = '';
 
+// Anything thrown inside a library callback can tear down the BLE
+// transport, so surface it in the log rather than losing it.
+window.addEventListener('error', ev => {
+  log('JS error: ' + (ev.message || 'unknown') +
+      (ev.filename ? ' @ ' + String(ev.filename).split('/').pop() + ':' + ev.lineno : ''));
+});
+window.addEventListener('unhandledrejection', ev => {
+  log('unhandled promise: ' + errStr(ev.reason));
+});
+
 function errStr(e) {
   if (!e) return 'unknown error';
   if (typeof e === 'string') return e;
@@ -499,27 +509,47 @@ btnConn.addEventListener('click', async () => {
     device = new MeshDevice(transport);
 
     device.events.onMessagePacket.subscribe(p => {
-      const text = String(p?.data ?? p?.payload ?? '').trim();
-      // The node reports our own outgoing packets back to us. Only the
-      // transmitter's replies start with '>', so everything else is echo.
-      if (text && !text.includes('>')) {
-        if (text === lastSent) return;       // exact echo, drop silently
-        log('rx (ignored): ' + text);
-        return;
+      // Everything in here is defensive: an exception thrown back into
+      // the library's event emitter can drop the BLE link.
+      try {
+        const text = String(p?.data ?? p?.payload ?? '').trim();
+
+        // The node reports our own outgoing packets back to us. Only the
+        // transmitter's replies contain '>', so the rest is echo.
+        if (text && !text.includes('>')) {
+          if (text !== lastSent) log('rx (ignored): ' + text);
+          return;
+        }
+
+        log('rx: ' + text);
+        // Defer the UI work out of the library's callback so a rendering
+        // error cannot propagate back into the transport.
+        setTimeout(() => {
+          try { handleReply(text); }
+          catch (e) { log('reply handler error: ' + errStr(e)); }
+        }, 0);
+      } catch (e) {
+        log('packet handler error: ' + errStr(e));
       }
-      log('rx: ' + text);
-      handleReply(text);
     });
 
     // 1 restarting, 2 disconnected, 3 connecting, 4 reconnecting,
     // 5 connected, 6 configuring, 7 configured
     if (device.events.onDeviceStatus) {
       device.events.onDeviceStatus.subscribe(st => {
-        const names = {1:'restarting',2:'disconnected',3:'connecting',
-                       4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
-        log('status ' + st + ' (' + (names[st] || '?') + ')');
-        if (st === 5 || st === 7) markReady();
-        if (st === 2) noteFlap();
+        try {
+          const names = {1:'restarting',2:'disconnected',3:'connecting',
+                         4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
+          log('status ' + st + ' (' + (names[st] || '?') + ')');
+          setTimeout(() => {
+            try {
+              if (st === 5 || st === 7) markReady();
+              if (st === 2) noteFlap();
+            } catch (e) { log('status handler error: ' + errStr(e)); }
+          }, 0);
+        } catch (e) {
+          log('status subscribe error: ' + errStr(e));
+        }
       });
     }
 
