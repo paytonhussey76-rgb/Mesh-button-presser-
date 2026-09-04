@@ -320,6 +320,16 @@ let freqIndex    = null;
 let pending      = null;
 let pendingTimer = null;
 let readyDone    = false;
+let busy         = false;
+let lastSent     = '';
+
+function errStr(e) {
+  if (!e) return 'unknown error';
+  if (typeof e === 'string') return e;
+  if (e.message) return e.message;
+  if (e.error)   return String(e.error);
+  try { return JSON.stringify(e); } catch (_) { return String(e); }
+}
 
 function log(msg, strong) {
   const t = new Date().toLocaleTimeString([], { hour12: false });
@@ -364,13 +374,15 @@ function render() {
   outText.textContent = 'output ' + outLevel;
   [...barsEl.children].forEach((bar, i) => bar.classList.toggle('lit', i < outLevel));
 
-  const live = connected && powerOn;
-  btnPower.disabled = !connected;
+  const live = connected && powerOn && !busy;
+  btnPower.disabled = !connected || busy;
   btnMark.disabled  = !connected;
   btnUp.disabled    = !live || outLevel >= OUT_MAX;
   btnDown.disabled  = !live || outLevel <= OUT_MIN;
-  freqBlock.classList.toggle('locked', !live);
-  outBlock.classList.toggle('locked', !live);
+  btnNext.disabled  = !live;
+  freqButtons.forEach(b => b.disabled = !live);
+  freqBlock.classList.toggle('locked', !(connected && powerOn));
+  outBlock.classList.toggle('locked', !(connected && powerOn));
 }
 
 // ---- library ---------------------------------------------------------
@@ -453,6 +465,9 @@ function markDropped() {
   dropTimer = null;
   connected = false;
   readyDone = false;
+  busy = false;
+  pending = null;
+  clearTimeout(pendingTimer);
 
   if (device) {
     try {
@@ -484,9 +499,16 @@ btnConn.addEventListener('click', async () => {
     device = new MeshDevice(transport);
 
     device.events.onMessagePacket.subscribe(p => {
-      const text = p?.data ?? p?.payload ?? '';
+      const text = String(p?.data ?? p?.payload ?? '').trim();
+      // The node reports our own outgoing packets back to us. Only the
+      // transmitter's replies start with '>', so everything else is echo.
+      if (text && !text.includes('>')) {
+        if (text === lastSent) return;       // exact echo, drop silently
+        log('rx (ignored): ' + text);
+        return;
+      }
       log('rx: ' + text);
-      handleReply(String(text));
+      handleReply(text);
     });
 
     // 1 restarting, 2 disconnected, 3 connecting, 4 reconnecting,
@@ -508,7 +530,7 @@ btnConn.addEventListener('click', async () => {
   } catch (e) {
     setLink('failed', 'down');
     setNote('Could not connect. Force-stop the Meshtastic app, then retry.', 'err');
-    log('connect failed: ' + String(e));
+    log('connect failed: ' + errStr(e));
     device = null;
     render();
   }
@@ -517,25 +539,39 @@ btnConn.addEventListener('click', async () => {
 // ---- sending ---------------------------------------------------------
 async function send(cmd) {
   if (!device) { log('not connected'); return; }
+  if (busy) { log('ignored ' + cmd + ' — still waiting on ' + pending); return; }
+
+  busy = true;
+  pending = cmd;
+  lastSent = cmd;
+  render();
+
+  log('tx: ' + cmd, true);
+  setNote('Sent ' + cmd + '. Waiting for the transmitter to confirm…');
+
+  clearTimeout(pendingTimer);
+  pendingTimer = setTimeout(() => {
+    if (pending) {
+      setNote('No reply to ' + pending + '. Out of range, or the box lost power.', 'warn');
+      setLink('no reply', 'down');
+      log('timeout waiting for ' + pending);
+      pending = null;
+      busy = false;
+      render();
+    }
+  }, 30000);
+
   try {
-    log('tx: ' + cmd, true);
-    pending = cmd;
-    setNote('Sent ' + cmd + '. Waiting for the transmitter to confirm…');
-
-    clearTimeout(pendingTimer);
-    pendingTimer = setTimeout(() => {
-      if (pending) {
-        setNote('No reply to ' + pending + '. Out of range, or the box lost power.', 'warn');
-        setLink('no reply', 'down');
-        log('timeout waiting for ' + pending);
-        pending = null;
-      }
-    }, 25000);
-
     await device.sendText(cmd);
   } catch (e) {
-    log('send failed: ' + String(e));
-    setNote('Send failed: ' + String(e).slice(0, 70), 'err');
+    const msg = errStr(e);
+    log('send failed: ' + msg);
+    setNote('Send failed: ' + msg.slice(0, 70) + '. Try reconnecting.', 'err');
+    clearTimeout(pendingTimer);
+    pending = null;
+    busy = false;
+    setLink('send error', 'down');
+    render();
   }
 }
 
@@ -565,6 +601,7 @@ function handleReply(raw) {
   const answered = pending;
   clearTimeout(pendingTimer);
   pending = null;
+  busy = false;
   setLink('connected', 'up');
 
   if (/^(NOW|SYNC)\s+/i.test(s)) {
