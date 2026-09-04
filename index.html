@@ -594,14 +594,11 @@ async function send(cmd) {
   try {
     await device.sendText(cmd);
   } catch (e) {
-    const msg = errStr(e);
-    log('send failed: ' + msg);
-    setNote('Send failed: ' + msg.slice(0, 70) + '. Try reconnecting.', 'err');
-    clearTimeout(pendingTimer);
-    pending = null;
-    busy = false;
-    setLink('send error', 'down');
-    render();
+    // The library rejects this promise on its own internal ack timeout,
+    // which fires well before a LoRa round trip completes. The
+    // transmitter's '>' reply is the real confirmation, so log the
+    // rejection and let the reply timeout decide whether it truly failed.
+    log('sendText rejected (' + errStr(e) + ') — waiting for the reply anyway');
   }
 }
 
