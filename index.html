@@ -322,6 +322,7 @@ let freqIndex    = null;
 let pending      = null;
 let pendingTimer = null;
 let readyDone    = false;
+let configured   = false;
 let busy         = false;
 let lastSent     = '';
 
@@ -462,14 +463,16 @@ function markReady() {
   log('ready', true);
   render();
 
-  // Give the BLE link a moment to stop flapping, then ask the C3 what
-  // frequency it last stepped to so the readout is not blank on launch.
+  // Nothing can be sent until the node has handed over its config, so
+  // only ask what frequency we are on once that has happened.
   setTimeout(() => {
-    if (device && !busy) {
+    if (device && configured && !busy) {
       log('auto-querying frequency');
       send('Q');
+    } else if (device) {
+      setNote('Connected. Tap "Check current frequency" when you are ready.');
     }
-  }, 2500);
+  }, 1500);
 }
 
 function noteFlap() {
@@ -487,6 +490,7 @@ function markDropped() {
   dropTimer = null;
   connected = false;
   readyDone = false;
+  configured = false;
   busy = false;
   pending = null;
   clearTimeout(pendingTimer);
@@ -511,6 +515,7 @@ btnConn.addEventListener('click', async () => {
 
   try {
     readyDone = false;
+    configured = false;
     clearTimeout(dropTimer);
     dropTimer = null;
     setLink('pairing…');
@@ -555,8 +560,14 @@ btnConn.addEventListener('click', async () => {
           log('status ' + st + ' (' + (names[st] || '?') + ')');
           setTimeout(() => {
             try {
-              if (st === 5 || st === 7) markReady();
-              if (st === 2) noteFlap();
+              // 7 = configured, and that is the only point at which the
+              // node will accept a packet. 5 only means the GATT link is
+              // up; sending during the handshake tears it down.
+              if (st === 7) { configured = true; markReady(); }
+              // A disconnect mid-handshake is normal, so only treat it as
+              // a real drop once configuration has completed.
+              if (st === 2 && configured) noteFlap();
+              if (st === 2 && !configured) log('   handshake blip, ignoring');
             } catch (e) { log('status handler error: ' + errStr(e)); }
           }, 0);
         } catch (e) {
@@ -567,8 +578,17 @@ btnConn.addEventListener('click', async () => {
 
     // configure() reports completion through the status event rather than
     // resolving its promise, so awaiting it would leave the UI locked.
-    device.configure().catch(e => log('configure: ' + String(e)));
-    setTimeout(() => { if (device) markReady(); }, 6000);
+    device.configure().catch(e => log('configure: ' + errStr(e)));
+
+    // Safety net: if the configured status never arrives, unlock anyway
+    // rather than leaving the app stuck.
+    setTimeout(() => {
+      if (device && !readyDone) {
+        log('no configured status after 9s — unlocking anyway');
+        configured = true;
+        markReady();
+      }
+    }, 9000);
   } catch (e) {
     setLink('failed', 'down');
     setNote('Could not connect. Force-stop the Meshtastic app, then retry.', 'err');
