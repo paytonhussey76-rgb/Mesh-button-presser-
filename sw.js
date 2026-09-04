@@ -1,7 +1,7 @@
 // Loc3 remote — offline support.
 // Bump CACHE when you change any of the local files, or phones will keep
 // serving the old copy.
-const CACHE = 'loc3-remote-v5';
+const CACHE = 'loc3-remote-v6';
 
 const LOCAL = [
   './',
