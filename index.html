@@ -245,6 +245,7 @@
     <span id="outText">output 1</span>
   </div>
   <div class="note" id="note">Loading radio library…</div>
+  <button class="mark" id="btnQuery" disabled>Check current frequency</button>
 </div>
 
 <button class="connect" id="btnConnect">Connect over Bluetooth</button>
@@ -304,6 +305,7 @@ const barsEl   = document.getElementById('bars');
 const btnConn  = document.getElementById('btnConnect');
 const btnPower = document.getElementById('btnPower');
 const btnMark  = document.getElementById('btnMark');
+const btnQuery = document.getElementById('btnQuery');
 const btnNext  = document.getElementById('btnNext');
 const btnUp    = document.getElementById('btnUp');
 const btnDown  = document.getElementById('btnDown');
@@ -387,6 +389,7 @@ function render() {
   const live = connected && powerOn && !busy;
   btnPower.disabled = !connected || busy;
   btnMark.disabled  = !connected;
+  btnQuery.disabled = !connected || busy;
   btnUp.disabled    = !live || outLevel >= OUT_MAX;
   btnDown.disabled  = !live || outLevel <= OUT_MIN;
   btnNext.disabled  = !live;
@@ -455,9 +458,18 @@ function markReady() {
   setLink('connected', 'up');
   btnConn.textContent = 'Connected';
   btnConn.disabled = true;
-  setNote('Connected. Turn the transmitter on, or mark it as already on.');
+  setNote('Connected. Checking which frequency the transmitter is on…');
   log('ready', true);
   render();
+
+  // Give the BLE link a moment to stop flapping, then ask the C3 what
+  // frequency it last stepped to so the readout is not blank on launch.
+  setTimeout(() => {
+    if (device && !busy) {
+      log('auto-querying frequency');
+      send('Q');
+    }
+  }, 2500);
 }
 
 function noteFlap() {
@@ -602,6 +614,7 @@ async function send(cmd) {
   }
 }
 
+btnQuery.addEventListener('click', () => send('Q'));
 btnPower.addEventListener('click', () => send('P'));
 btnNext.addEventListener('click',  () => send('F1'));
 btnUp.addEventListener('click',    () => { if (outLevel < OUT_MAX) send('U1'); });
