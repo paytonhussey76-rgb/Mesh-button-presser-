@@ -699,6 +699,14 @@ async function openConnection(kind) {
       setNote('Reaching the node at ' + ip + '…');
       log('opening http transport to ' + ip);
       transport = await TransportHTTP.create(ip, false);   // false = no TLS
+      // HTTP has no push: the transport polls the node for anything
+      // waiting. Without this it barely checks, so replies never land.
+      try {
+        transport.fetchInterval = 1500;
+        log('poll interval set to 1.5s');
+      } catch (e) {
+        log('could not set poll interval: ' + errStr(e));
+      }
     } else {
       setLink('pairing…');
       setNote('Pick your node from the list. The Meshtastic app must be closed.');
