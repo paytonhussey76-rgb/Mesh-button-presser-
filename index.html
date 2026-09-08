@@ -441,6 +441,7 @@ let readyDone    = false;
 let configured   = false;
 let connecting   = false;
 let activeTransport = null;
+let configPackets = 0;
 let busy         = false;
 let lastSent     = '';
 
@@ -475,6 +476,14 @@ function recall(key, fallback) {
     const v = localStorage.getItem('loc3.' + key);
     return v === null ? fallback : v;
   } catch (_) { return fallback; }
+}
+
+// Stage timing, so slow connects can be attributed rather than guessed.
+let t0 = 0;
+function stampStart() { t0 = performance.now(); }
+function stamp(label) {
+  const ms = Math.round(performance.now() - t0);
+  log('  +' + ms + 'ms  ' + label);
 }
 
 function errStr(e) {
@@ -658,6 +667,9 @@ function markReady() {
     } catch (_) {}
   }
 
+  stamp('CONFIGURED — usable');
+  log('config took ' + configPackets + ' packets');
+
   setNote('Connected. Checking which frequency the transmitter is on…');
   log('ready', true);
   render();
@@ -716,6 +728,7 @@ async function openConnection(kind) {
 
     readyDone = false;
     configured = false;
+    configPackets = 0;
     clearTimeout(dropTimer);
     dropTimer = null;
 
@@ -726,13 +739,25 @@ async function openConnection(kind) {
       setNote('Reaching the node at ' + ip + '…');
       log('opening http transport to ' + ip);
       remember('ip', ip);
+      stampStart();
+
+      // Probe the node directly first. This separates "the node is slow
+      // to answer" from "the library is slow to set up".
+      try {
+        const probe = await fetch('http://' + ip + '/hotspot-detect.html',
+                                  { method: 'GET', cache: 'no-store', mode: 'no-cors' });
+        stamp('node answered a plain http request');
+      } catch (e) {
+        stamp('probe failed: ' + errStr(e).slice(0, 60));
+      }
       transport = await TransportHTTP.create(ip, false);   // false = no TLS
+      stamp('transport created');
       // HTTP has no push, so the transport polls. The config handshake
       // needs many round trips, and at a slow interval that is most of
       // the connect time. Poll hard now, back off once configured.
       try {
-        transport.fetchInterval = 200;
-        log('poll interval 200ms for setup');
+        transport.fetchInterval = 45;
+        log('poll interval 45ms for setup');
       } catch (e) {
         log('could not set poll interval: ' + errStr(e));
       }
@@ -745,6 +770,7 @@ async function openConnection(kind) {
 
     activeTransport = transport;
     device = new MeshDevice(transport);
+    stamp('device object built');
 
     // Diagnostic: list what the library actually exposes, and confirm
     // the poll interval took. Different transports surface packets on
@@ -761,8 +787,16 @@ async function openConnection(kind) {
 
     // Catch-all: subscribe to every packet-ish event so nothing arriving
     // goes unnoticed while we work out which one carries text.
-    ['onFromRadio', 'onMeshPacket', 'onMeshHeartbeat', 'onPacket',
-     'onDecodedPacket', 'onTextPacket', 'onRoutingPacket'].forEach(name => {
+    // Count the config stream rather than printing every packet — it was
+    // roughly seventy lines of noise per connect.
+    try {
+      const fr = device.events && device.events.onFromRadio;
+      if (fr && typeof fr.subscribe === 'function') {
+        fr.subscribe(() => { configPackets++; });
+      }
+    } catch (_) {}
+
+    ['onMeshPacket', 'onRoutingPacket'].forEach(name => {
       try {
         const ev = device.events && device.events[name];
         if (ev && typeof ev.subscribe === 'function') {
@@ -822,6 +856,7 @@ async function openConnection(kind) {
       });
     }
 
+    stamp('calling configure');
     device.configure().catch(e => log('configure: ' + errStr(e)));
     connecting = false;
 
@@ -1002,7 +1037,7 @@ function handleReply(raw) {
 }
 
 // ---- offline support -------------------------------------------------
-const BUILD = 'v17';
+const BUILD = 'v19';
 log('build ' + BUILD, true);
 
 if ('serviceWorker' in navigator) {
