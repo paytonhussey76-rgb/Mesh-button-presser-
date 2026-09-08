@@ -208,6 +208,39 @@
   .bars i:nth-child(4) { height: 80%; }
   .bars i:nth-child(5) { height: 100%; }
 
+  /* ---- calibration ---- */
+  .calrow {
+    display: grid;
+    grid-template-columns: 1fr 54px 54px 54px 62px;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+  }
+  .calrow + .calrow { border-top: 1px solid #232019; }
+  .calrow .who { font-size: 14px; font-weight: 600; }
+  .calrow .val {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 17px;
+    font-weight: 650;
+    color: var(--hivis);
+  }
+  .calrow button {
+    min-height: 42px;
+    padding: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .calrow button.test { font-size: 13px; }
+  .calnote {
+    padding: 8px 0 2px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--mute);
+  }
+  .calfoot { display: flex; gap: 8px; padding-top: 8px; }
+  .calfoot button { flex: 1; min-height: 44px; font-size: 14px; }
+
   /* ---- log ---- */
   details {
     border: 1px solid var(--edge);
@@ -270,6 +303,51 @@
   </div>
 </div>
 
+<details id="calPanel">
+  <summary>Press depth calibration</summary>
+  <div style="padding:0 12px 12px">
+    <div class="calnote">
+      Degrees the horn travels onto each key. Raise a few at a time until
+      presses are reliable, then stop &mdash; past the point the key bottoms
+      out the servo is stalling. Saved on the C3, survives a reboot.
+    </div>
+
+    <div class="calrow" data-key="P">
+      <span class="who">Power</span>
+      <button class="cal-dn">&minus;</button>
+      <span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button>
+      <button class="test">Test</button>
+    </div>
+    <div class="calrow" data-key="F">
+      <span class="who">Frequency</span>
+      <button class="cal-dn">&minus;</button>
+      <span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button>
+      <button class="test">Test</button>
+    </div>
+    <div class="calrow" data-key="U">
+      <span class="who">Output +</span>
+      <button class="cal-dn">&minus;</button>
+      <span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button>
+      <button class="test">Test</button>
+    </div>
+    <div class="calrow" data-key="D">
+      <span class="who">Output &minus;</span>
+      <button class="cal-dn">&minus;</button>
+      <span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button>
+      <button class="test">Test</button>
+    </div>
+
+    <div class="calfoot">
+      <button id="calRead">Read from device</button>
+      <button id="calReset">Reset to defaults</button>
+    </div>
+  </div>
+</details>
+
 <details>
   <summary>Activity log</summary>
   <div id="log">ready.</div>
@@ -306,6 +384,8 @@ const btnConn  = document.getElementById('btnConnect');
 const btnPower = document.getElementById('btnPower');
 const btnMark  = document.getElementById('btnMark');
 const btnQuery = document.getElementById('btnQuery');
+const calRead  = document.getElementById('calRead');
+const calReset = document.getElementById('calReset');
 const btnNext  = document.getElementById('btnNext');
 const btnUp    = document.getElementById('btnUp');
 const btnDown  = document.getElementById('btnDown');
@@ -319,6 +399,10 @@ let connected    = false;
 let powerOn      = false;
 let outLevel     = 1;
 let freqIndex    = null;
+let angles       = { P: null, F: null, U: null, D: null };
+const ANGLE_STEP = 2;
+const ANGLE_MIN  = 0;
+const ANGLE_MAX  = 75;
 let pending      = null;
 let pendingTimer = null;
 let readyDone    = false;
@@ -386,6 +470,18 @@ function render() {
 
   outText.textContent = 'output ' + outLevel;
   [...barsEl.children].forEach((bar, i) => bar.classList.toggle('lit', i < outLevel));
+
+  // calibration rows
+  document.querySelectorAll('.calrow').forEach(row => {
+    const k = row.dataset.key;
+    const v = angles[k];
+    row.querySelector('.val').textContent = (v === null ? '—' : v);
+    row.querySelector('.cal-dn').disabled = !connected || busy || v === null || v <= ANGLE_MIN;
+    row.querySelector('.cal-up').disabled = !connected || busy || v === null || v >= ANGLE_MAX;
+    row.querySelector('.test').disabled   = !connected || busy;
+  });
+  calRead.disabled  = !connected || busy;
+  calReset.disabled = !connected || busy;
 
   const live = connected && powerOn && !busy;
   btnPower.disabled = !connected || busy;
@@ -469,6 +565,8 @@ function markReady() {
     if (device && configured && !busy) {
       log('auto-querying frequency');
       send('Q');
+      // ask for the saved press depths once the frequency reply lands
+      setTimeout(() => { if (device && !busy) send('A?'); }, 3000);
     } else if (device) {
       setNote('Connected. Tap "Check current frequency" when you are ready.');
     }
@@ -635,6 +733,26 @@ async function send(cmd) {
 }
 
 btnQuery.addEventListener('click', () => send('Q'));
+
+// ---- calibration ----
+const TEST_CMD = { P: 'P', F: 'F1', U: 'U1', D: 'D1' };
+
+document.querySelectorAll('.calrow').forEach(row => {
+  const k = row.dataset.key;
+  row.querySelector('.cal-up').addEventListener('click', () => nudgeAngle(k, +ANGLE_STEP));
+  row.querySelector('.cal-dn').addEventListener('click', () => nudgeAngle(k, -ANGLE_STEP));
+  row.querySelector('.test').addEventListener('click', () => send(TEST_CMD[k]));
+});
+
+function nudgeAngle(key, delta) {
+  if (angles[key] === null) { log('read the angles from the device first'); return; }
+  const next = Math.max(ANGLE_MIN, Math.min(ANGLE_MAX, angles[key] + delta));
+  if (next === angles[key]) return;
+  send('A' + key + next);
+}
+
+calRead.addEventListener('click',  () => send('A?'));
+calReset.addEventListener('click', () => send('AR'));
 btnPower.addEventListener('click', () => send('P'));
 btnNext.addEventListener('click',  () => send('F1'));
 btnUp.addEventListener('click',    () => { if (outLevel < OUT_MAX) send('U1'); });
@@ -664,7 +782,20 @@ function handleReply(raw) {
   busy = false;
   setLink('connected', 'up');
 
-  if (/^(NOW|SYNC)\s+/i.test(s)) {
+  if (/^ANG\b/i.test(s)) {
+    // >ANG P30 F38 D30 U30
+    let found = 0;
+    s.replace(/([PFDU])\s*(-?\d+)/gi, (_m, key, num) => {
+      angles[key.toUpperCase()] = parseInt(num, 10);
+      found++;
+      return '';
+    });
+    setNote(found
+      ? 'Press depths: power ' + angles.P + '°, freq ' + angles.F +
+        '°, out+ ' + angles.U + '°, out− ' + angles.D + '°.'
+      : 'Could not read press depths.', found ? null : 'warn');
+
+  } else if (/^(NOW|SYNC)\s+/i.test(s)) {
     const name = s.replace(/^(NOW|SYNC)\s+/i, '').trim();
     const idx = FREQS.findIndex(f => f.toLowerCase() === name.toLowerCase());
     freqIndex = idx >= 0 ? idx : null;
