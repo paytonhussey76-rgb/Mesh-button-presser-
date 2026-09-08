@@ -617,7 +617,7 @@ btnConn.addEventListener('click', async () => {
     clearTimeout(dropTimer);
     dropTimer = null;
     setLink('pairing…');
-    setNote('Pick the transmitter node from the Bluetooth list.');
+    setNote('Pick your node from the list. The Meshtastic app must be fully closed.');
     log('requesting device…');
 
     const transport = await TransportWebBluetooth.create();
@@ -678,15 +678,30 @@ btnConn.addEventListener('click', async () => {
     // resolving its promise, so awaiting it would leave the UI locked.
     device.configure().catch(e => log('configure: ' + errStr(e)));
 
-    // Safety net: if the configured status never arrives, unlock anyway
-    // rather than leaving the app stuck.
+    // Without a completed config handshake the node has no channel data,
+    // so sendText builds packets that go nowhere. Unlocking the UI early
+    // just hides that. Retry once, then fail honestly.
     setTimeout(() => {
-      if (device && !readyDone) {
-        log('no configured status after 9s — unlocking anyway');
-        configured = true;
-        markReady();
+      if (device && !configured) {
+        log('config incomplete after 10s — retrying');
+        setNote('Still setting up. Retrying…', 'warn');
+        try {
+          device.configure().catch(e => log('configure retry: ' + errStr(e)));
+        } catch (e) {
+          log('configure retry threw: ' + errStr(e));
+        }
       }
-    }, 9000);
+    }, 10000);
+
+    setTimeout(() => {
+      if (device && !configured) {
+        log('config never completed — giving up');
+        setNote('The node connected but never finished setup. Fully close ' +
+                'the Meshtastic app (or revoke its Nearby devices permission), ' +
+                'then reconnect.', 'err');
+        markDropped();
+      }
+    }, 22000);
   } catch (e) {
     setLink('failed', 'down');
     setNote('Could not connect. Force-stop the Meshtastic app, then retry.', 'err');
