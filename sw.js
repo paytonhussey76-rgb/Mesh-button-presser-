@@ -1,7 +1,11 @@
 // Loc3 remote — offline support.
-// Bump CACHE when you change any of the local files, or phones will keep
-// serving the old copy.
-const CACHE = 'loc3-remote-v12';
+//
+// Strategy matters here. The earlier version was cache-first for
+// everything, which meant a new index.html never reached the browser
+// even after this worker updated. HTML now goes to the network first
+// and only falls back to cache when there is no signal.
+
+const CACHE = 'loc3-remote-v17';
 
 const LOCAL = [
   './',
@@ -18,7 +22,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
       .then(c => c.addAll(LOCAL))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting())      // take over immediately
   );
 });
 
@@ -32,6 +36,17 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Lets the page ask this worker to activate without waiting.
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
+});
+
+function isHtml(request) {
+  if (request.mode === 'navigate') return true;
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
+}
+
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -39,8 +54,24 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
 
+  // ---- HTML: always try the network, so updates land straight away ----
+  if (sameOrigin && isHtml(req)) {
+    event.respondWith(
+      fetch(req, { cache: 'no-store' })
+        .then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // ---- other local files: serve fast, refresh in the background ----
   if (sameOrigin) {
-    // Local files: serve from cache, refresh in the background.
     event.respondWith(
       caches.match(req).then(hit => {
         const net = fetch(req)
@@ -58,8 +89,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // The meshtastic library comes from a CDN. Cache whatever loads
-  // successfully so the app still works with no signal.
+  // ---- CDN modules: cache once, they are version-pinned upstream ----
   event.respondWith(
     caches.match(req).then(hit => {
       if (hit) return hit;
