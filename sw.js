@@ -5,7 +5,7 @@
 // even after this worker updated. HTML now goes to the network first
 // and only falls back to cache when there is no signal.
 
-const CACHE = 'loc3-remote-v17';
+const CACHE = 'loc3-remote-v19';
 
 const LOCAL = [
   './',
