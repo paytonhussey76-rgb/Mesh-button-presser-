@@ -407,6 +407,7 @@ let pending      = null;
 let pendingTimer = null;
 let readyDone    = false;
 let configured   = false;
+let connecting   = false;
 let busy         = false;
 let lastSent     = '';
 
@@ -416,8 +417,19 @@ window.addEventListener('error', ev => {
   log('JS error: ' + (ev.message || 'unknown') +
       (ev.filename ? ' @ ' + String(ev.filename).split('/').pop() + ':' + ev.lineno : ''));
 });
+let lastRejection = '';
+let rejectionCount = 0;
 window.addEventListener('unhandledrejection', ev => {
-  log('unhandled promise: ' + errStr(ev.reason));
+  const msg = errStr(ev.reason);
+  if (msg === lastRejection) {
+    rejectionCount++;
+    if (rejectionCount % 5 !== 0) return;   // thin out repeats
+    log('unhandled promise: ' + msg + '  (x' + (rejectionCount + 1) + ')');
+    return;
+  }
+  lastRejection = msg;
+  rejectionCount = 0;
+  log('unhandled promise: ' + msg);
 });
 
 function errStr(e) {
@@ -545,6 +557,31 @@ if (MeshDevice && TransportWebBluetooth) {
 const DROP_GRACE = 4000;
 let dropTimer = null;
 
+// Every abandoned MeshDevice keeps polling GATT in the background, and
+// Web Bluetooth only allows one operation at a time. Without a real
+// teardown, each retry adds another competitor and the link collapses.
+async function teardown(reason) {
+  clearTimeout(dropTimer);
+  clearTimeout(pendingTimer);
+  dropTimer = null;
+  const old = device;
+  device = null;
+  connected = false;
+  configured = false;
+  readyDone = false;
+  busy = false;
+  pending = null;
+  if (old) {
+    log('tearing down previous connection' + (reason ? ' (' + reason + ')' : ''));
+    try {
+      if (typeof old.disconnect === 'function') await old.disconnect();
+    } catch (e) {
+      log('   disconnect: ' + errStr(e));
+    }
+  }
+  render();
+}
+
 function markReady() {
   clearTimeout(dropTimer);
   dropTimer = null;
@@ -570,7 +607,7 @@ function markReady() {
     } else if (device) {
       setNote('Connected. Tap "Check current frequency" when you are ready.');
     }
-  }, 1500);
+  }, 4000);
 }
 
 function noteFlap() {
@@ -584,34 +621,27 @@ function noteFlap() {
 }
 
 function markDropped() {
-  clearTimeout(dropTimer);
-  dropTimer = null;
-  connected = false;
-  readyDone = false;
-  configured = false;
-  busy = false;
-  pending = null;
-  clearTimeout(pendingTimer);
-
-  if (device) {
-    try {
-      if (typeof device.disconnect === 'function') device.disconnect();
-    } catch (e) { /* transport may already be gone */ }
-  }
-  device = null;
-
+  teardown('link lost');
   setLink('disconnected', 'down');
   btnConn.disabled = false;
   btnConn.textContent = 'Reconnect';
-  setNote('Bluetooth link dropped. Force-stop the Meshtastic app, then reconnect.', 'err');
-  render();
+  setNote('Bluetooth link dropped. Tap reconnect.', 'err');
 }
 
 btnConn.addEventListener('click', async () => {
   if (!MeshDevice) { log('no library, cannot connect'); return; }
+  if (connecting) { log('connection attempt already running'); return; }
   if (device) { log('already connected'); return; }
 
+  connecting = true;
+  btnConn.disabled = true;
+
   try {
+    // Clear out anything left from a previous attempt, then give the
+    // Bluetooth stack a moment before opening a new GATT connection.
+    await teardown('starting fresh');
+    await new Promise(r => setTimeout(r, 1200));
+
     readyDone = false;
     configured = false;
     clearTimeout(dropTimer);
@@ -681,6 +711,8 @@ btnConn.addEventListener('click', async () => {
     // Without a completed config handshake the node has no channel data,
     // so sendText builds packets that go nowhere. Unlocking the UI early
     // just hides that. Retry once, then fail honestly.
+    connecting = false;
+
     setTimeout(() => {
       if (device && !configured) {
         log('config incomplete after 10s — retrying');
@@ -706,8 +738,9 @@ btnConn.addEventListener('click', async () => {
     setLink('failed', 'down');
     setNote('Could not connect. Force-stop the Meshtastic app, then retry.', 'err');
     log('connect failed: ' + errStr(e));
-    device = null;
-    render();
+    connecting = false;
+    btnConn.disabled = false;
+    await teardown('connect failed');
   }
 });
 
