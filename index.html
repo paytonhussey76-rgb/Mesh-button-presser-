@@ -79,6 +79,19 @@
     font-variant-numeric: tabular-nums;
   }
   .freq.unknown { color: var(--mute); font-weight: 500; font-size: 26px; }
+  .freq.stale { color: #B8AC96; }
+  .stale-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 7px;
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--mute);
+    vertical-align: middle;
+  }
   .state {
     margin-top: 10px;
     display: flex;
@@ -443,6 +456,10 @@ let connecting   = false;
 let activeTransport = null;
 let configPackets = 0;
 let lastPacketAt = 0;
+let haveChannel  = false;
+let haveNodeInfo = false;
+let earlyUnlock  = false;
+let stateConfirmed = false;   // false until the device tells us
 let busy         = false;
 let lastSent     = '';
 
@@ -517,13 +534,25 @@ FREQS.forEach((name, i) => {
 });
 const freqButtons = [...freqGrid.querySelectorAll('button')];
 
+function saveState() {
+  remember('freq',  freqIndex === null ? '' : freqIndex);
+  remember('power', powerOn ? '1' : '0');
+  remember('out',   outLevel);
+}
+
 function render() {
   if (freqIndex === null) {
     freqVal.textContent = 'frequency unknown';
     freqVal.className = 'freq unknown';
   } else {
     freqVal.textContent = FREQS[freqIndex];
-    freqVal.className = 'freq';
+    freqVal.className = 'freq' + (stateConfirmed ? '' : ' stale');
+    if (!stateConfirmed) {
+      const tag = document.createElement('span');
+      tag.className = 'stale-tag';
+      tag.textContent = 'last known';
+      freqVal.appendChild(tag);
+    }
   }
   freqButtons.forEach((b, i) => b.classList.toggle('active', i === freqIndex));
 
@@ -651,6 +680,7 @@ async function teardown(reason) {
 function markReady() {
   clearTimeout(dropTimer);
   dropTimer = null;
+  clearInterval(window.__loc3Progress);
   if (!device) return;          // nothing behind the UI, ignore
   if (readyDone) return;
   readyDone = true;
@@ -671,23 +701,25 @@ function markReady() {
   clearInterval(window.__loc3Progress);
   stamp('CONFIGURED — usable');
   log('config took ' + configPackets + ' packets');
+  if (earlyUnlock) log('(was already usable before this)');
 
   setNote('Connected. Checking which frequency the transmitter is on…');
   log('ready', true);
   render();
 
-  // Nothing can be sent until the node has handed over its config, so
-  // only ask what frequency we are on once that has happened.
+  // No automatic query. The C3 holds the real state, and the readout
+  // already shows what it was last time, so waiting on a round trip
+  // before you can press anything is wasted time.
+  if (freqIndex !== null && !stateConfirmed) {
+    setNote('Showing last known state. Commands work now; tap "Check current frequency" to confirm.');
+  } else if (freqIndex === null) {
+    setNote('Connected. Tap "Check current frequency" if you want to confirm the state.');
+  }
+
+  // Press depths are only needed if you open the calibration panel.
   setTimeout(() => {
-    if (device && configured && !busy) {
-      log('auto-querying frequency');
-      send('Q');
-      // ask for the saved press depths once the frequency reply lands
-      setTimeout(() => { if (device && !busy) send('A?'); }, 3000);
-    } else if (device) {
-      setNote('Connected. Tap "Check current frequency" when you are ready.');
-    }
-  }, 4000);
+    if (device && configured && !busy && angles.F === null) send('A?');
+  }, 5000);
 }
 
 function noteFlap() {
@@ -731,6 +763,9 @@ async function openConnection(kind) {
     readyDone = false;
     configured = false;
     configPackets = 0;
+    haveChannel = false;
+    haveNodeInfo = false;
+    earlyUnlock = false;
     clearTimeout(dropTimer);
     dropTimer = null;
 
@@ -789,6 +824,33 @@ async function openConnection(kind) {
 
     // Catch-all: subscribe to every packet-ish event so nothing arriving
     // goes unnoticed while we work out which one carries text.
+    // Sending only needs our own node identity and the channel. Those
+    // arrive early in the config stream; the node database is the bulk
+    // and arrives last. Unlock as soon as the essentials land rather
+    // than waiting for the whole download.
+    function tryEarlyUnlock(what) {
+      log('got ' + what);
+      if (!haveChannel || !haveNodeInfo) return;
+      if (earlyUnlock || configured) return;
+      earlyUnlock = true;
+      stamp('essentials received — unlocking early');
+      markReady();
+    }
+
+    try {
+      const ch = device.events && device.events.onChannelPacket;
+      if (ch && ch.subscribe) ch.subscribe(() => {
+        if (!haveChannel) { haveChannel = true; tryEarlyUnlock('channel'); }
+      });
+    } catch (_) {}
+
+    try {
+      const ni = device.events && device.events.onMyNodeInfo;
+      if (ni && ni.subscribe) ni.subscribe(() => {
+        if (!haveNodeInfo) { haveNodeInfo = true; tryEarlyUnlock('my node info'); }
+      });
+    } catch (_) {}
+
     // Count the config stream rather than printing every packet — it was
     // roughly seventy lines of noise per connect.
     try {
@@ -982,6 +1044,7 @@ btnMark.addEventListener('click', () => {
   setNote(powerOn ? 'Marked as on. Nothing was sent.'
                   : 'Marked as off. Nothing was sent.');
   log('manual state: power ' + (powerOn ? 'on' : 'off'));
+  saveState();
   render();
 });
 
@@ -997,6 +1060,7 @@ function handleReply(raw) {
   clearTimeout(pendingTimer);
   pending = null;
   busy = false;
+  stateConfirmed = true;
   setLink('connected', 'up');
 
   if (/^ANG\b/i.test(s)) {
@@ -1047,11 +1111,12 @@ function handleReply(raw) {
     setNote(s);
   }
 
+  saveState();
   render();
 }
 
 // ---- offline support -------------------------------------------------
-const BUILD = 'v20';
+const BUILD = 'v22';
 log('build ' + BUILD, true);
 
 if ('serviceWorker' in navigator) {
@@ -1137,6 +1202,19 @@ document.addEventListener('visibilitychange', () => {
 
 // Restore the last node address, and reconnect on its own if we have
 // one. A failed attempt just falls back to the buttons.
+// Restore what we knew last time so the readout is useful immediately.
+const savedFreq = recall('freq', '');
+if (savedFreq !== '') {
+  const idx = parseInt(savedFreq, 10);
+  if (!isNaN(idx) && idx >= 0 && idx < FREQS.length) {
+    freqIndex = idx;
+    log('last known frequency: ' + FREQS[idx]);
+  }
+}
+powerOn  = recall('power', '0') === '1';
+outLevel = Math.max(OUT_MIN, Math.min(OUT_MAX, parseInt(recall('out', '1'), 10) || 1));
+stateConfirmed = false;
+
 const savedIp = recall('ip', '');
 if (savedIp) {
   nodeIpEl.value = savedIp;
