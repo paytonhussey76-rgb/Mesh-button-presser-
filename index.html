@@ -440,6 +440,7 @@ let pendingTimer = null;
 let readyDone    = false;
 let configured   = false;
 let connecting   = false;
+let activeTransport = null;
 let busy         = false;
 let lastSent     = '';
 
@@ -463,6 +464,18 @@ window.addEventListener('unhandledrejection', ev => {
   rejectionCount = 0;
   log('unhandled promise: ' + msg);
 });
+
+// Storage may be blocked depending on how the page is opened, so every
+// access is guarded and simply does nothing if unavailable.
+function remember(key, value) {
+  try { localStorage.setItem('loc3.' + key, String(value)); } catch (_) {}
+}
+function recall(key, fallback) {
+  try {
+    const v = localStorage.getItem('loc3.' + key);
+    return v === null ? fallback : v;
+  } catch (_) { return fallback; }
+}
 
 function errStr(e) {
   if (!e) return 'unknown error';
@@ -608,6 +621,7 @@ async function teardown(reason) {
   dropTimer = null;
   const old = device;
   device = null;
+  activeTransport = null;
   connected = false;
   configured = false;
   readyDone = false;
@@ -635,6 +649,15 @@ function markReady() {
   btnConn.textContent = 'Connected';
   btnConn.disabled = true;
   btnConnBle.disabled = true;
+  // Setup is done, so stop hammering the node. 700ms still picks up a
+  // reply within a second without polling flat out all shift.
+  if (activeTransport) {
+    try {
+      activeTransport.fetchInterval = 700;
+      log('poll interval eased to 700ms');
+    } catch (_) {}
+  }
+
   setNote('Connected. Checking which frequency the transmitter is on…');
   log('ready', true);
   render();
@@ -681,11 +704,15 @@ async function openConnection(kind) {
   btnConn.disabled = true;
   btnConnBle.disabled = true;
 
+  // Only wait for the radio stack to settle if there was actually a
+  // previous connection to tear down.
+  const old_device_existed = !!device;
+
   try {
     // Clear out anything left from a previous attempt, then give the
     // radio stack a moment before opening a new connection.
     await teardown('starting fresh');
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, old_device_existed ? 800 : 150));
 
     readyDone = false;
     configured = false;
@@ -698,12 +725,14 @@ async function openConnection(kind) {
       setLink('connecting…');
       setNote('Reaching the node at ' + ip + '…');
       log('opening http transport to ' + ip);
+      remember('ip', ip);
       transport = await TransportHTTP.create(ip, false);   // false = no TLS
-      // HTTP has no push: the transport polls the node for anything
-      // waiting. Without this it barely checks, so replies never land.
+      // HTTP has no push, so the transport polls. The config handshake
+      // needs many round trips, and at a slow interval that is most of
+      // the connect time. Poll hard now, back off once configured.
       try {
-        transport.fetchInterval = 1500;
-        log('poll interval set to 1.5s');
+        transport.fetchInterval = 200;
+        log('poll interval 200ms for setup');
       } catch (e) {
         log('could not set poll interval: ' + errStr(e));
       }
@@ -714,7 +743,42 @@ async function openConnection(kind) {
       transport = await TransportWebBluetooth.create();
     }
 
+    activeTransport = transport;
     device = new MeshDevice(transport);
+
+    // Diagnostic: list what the library actually exposes, and confirm
+    // the poll interval took. Different transports surface packets on
+    // different events.
+    try {
+      const evNames = Object.keys(device.events || {});
+      log('events available: ' + (evNames.length ? evNames.join(', ') : 'none found'));
+      if (kind === 'wifi') {
+        log('fetchInterval now: ' + transport.fetchInterval);
+      }
+    } catch (e) {
+      log('could not inspect events: ' + errStr(e));
+    }
+
+    // Catch-all: subscribe to every packet-ish event so nothing arriving
+    // goes unnoticed while we work out which one carries text.
+    ['onFromRadio', 'onMeshPacket', 'onMeshHeartbeat', 'onPacket',
+     'onDecodedPacket', 'onTextPacket', 'onRoutingPacket'].forEach(name => {
+      try {
+        const ev = device.events && device.events[name];
+        if (ev && typeof ev.subscribe === 'function') {
+          ev.subscribe(pkt => {
+            try {
+              let hint = '';
+              if (pkt && typeof pkt === 'object') {
+                if (pkt.data !== undefined) hint = ' data=' + String(pkt.data).slice(0, 40);
+                else if (pkt.payload !== undefined) hint = ' payload=' + String(pkt.payload).slice(0, 40);
+              }
+              log('[' + name + ']' + hint);
+            } catch (_) { log('[' + name + ']'); }
+          });
+        }
+      } catch (_) { /* event not present on this version */ }
+    });
 
     device.events.onMessagePacket.subscribe(p => {
       // Everything here is defensive: an exception thrown back into the
@@ -771,7 +835,7 @@ async function openConnection(kind) {
           log('configure retry threw: ' + errStr(e));
         }
       }
-    }, 10000);
+    }, 7000);
 
     setTimeout(() => {
       if (device && !configured) {
@@ -938,13 +1002,103 @@ function handleReply(raw) {
 }
 
 // ---- offline support -------------------------------------------------
+const BUILD = 'v17';
+log('build ' + BUILD, true);
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(() => log('offline support installed'))
+      .then(reg => {
+        log('offline support installed');
+        // Check for a newer worker on every launch, and take it without
+        // making the user clear site data by hand.
+        reg.update().catch(() => {});
+        reg.addEventListener('updatefound', () => {
+          const fresh = reg.installing;
+          if (!fresh) return;
+          fresh.addEventListener('statechange', () => {
+            if (fresh.state === 'installed' && navigator.serviceWorker.controller) {
+              log('a newer version is ready — reloading');
+              fresh.postMessage('skipWaiting');
+              setTimeout(() => location.reload(), 400);
+            }
+          });
+        });
+      })
       .catch(e => log('service worker failed: ' + String(e).slice(0, 80)));
+
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
   });
 }
+
+// Android suspends backgrounded web apps, so hold a wake lock while the
+// app is on screen. This keeps the session alive during a job rather
+// than dropping it every time the screen dims.
+let wakeLock = null;
+
+async function grabWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  if (wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    log('screen wake lock held');
+  } catch (e) {
+    log('wake lock unavailable: ' + errStr(e));
+  }
+}
+
+function dropWakeLock() {
+  if (!wakeLock) return;
+  try { wakeLock.release(); } catch (_) {}
+  wakeLock = null;
+}
+
+// Coming back to the app should feel like it never left. Retake the wake
+// lock and reopen the connection if Android tore it down while hidden.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') {
+    dropWakeLock();
+    return;
+  }
+  grabWakeLock();
+  const ip = (nodeIpEl.value || '').trim();
+  if (!device && !connecting && ip && TransportHTTP) {
+    log('back in view — reconnecting');
+    setNote('Reconnecting…');
+    openConnection('wifi');
+  }
+});
+
+// Restore the last node address, and reconnect on its own if we have
+// one. A failed attempt just falls back to the buttons.
+const savedIp = recall('ip', '');
+if (savedIp) {
+  nodeIpEl.value = savedIp;
+  log('remembered node address ' + savedIp);
+}
+
+nodeIpEl.addEventListener('change', () => {
+  const v = nodeIpEl.value.trim();
+  if (v) { remember('ip', v); log('saved node address ' + v); }
+});
+
+if (recall('auto', '1') === '1' && savedIp && MeshDevice && TransportHTTP) {
+  setTimeout(() => {
+    if (!device && !connecting) {
+      log('auto-connecting to ' + savedIp);
+      setNote('Reconnecting to ' + savedIp + '…');
+      openConnection('wifi');
+    }
+  }, 200);
+}
+
+grabWakeLock();
 
 render();
 </script>
