@@ -442,6 +442,7 @@ let configured   = false;
 let connecting   = false;
 let activeTransport = null;
 let configPackets = 0;
+let lastPacketAt = 0;
 let busy         = false;
 let lastSent     = '';
 
@@ -667,6 +668,7 @@ function markReady() {
     } catch (_) {}
   }
 
+  clearInterval(window.__loc3Progress);
   stamp('CONFIGURED — usable');
   log('config took ' + configPackets + ' packets');
 
@@ -792,7 +794,7 @@ async function openConnection(kind) {
     try {
       const fr = device.events && device.events.onFromRadio;
       if (fr && typeof fr.subscribe === 'function') {
-        fr.subscribe(() => { configPackets++; });
+        fr.subscribe(() => { configPackets++; lastPacketAt = Date.now(); });
       }
     } catch (_) {}
 
@@ -858,19 +860,31 @@ async function openConnection(kind) {
 
     stamp('calling configure');
     device.configure().catch(e => log('configure: ' + errStr(e)));
+
+    clearInterval(window.__loc3Progress);
+    window.__loc3Progress = setInterval(() => {
+      if (configured || !device) { clearInterval(window.__loc3Progress); return; }
+      setNote('Loading node config… ' + configPackets + ' of about 70 packets.');
+    }, 900);
     connecting = false;
 
-    setTimeout(() => {
-      if (device && !configured) {
-        log('config incomplete after 10s — retrying');
-        setNote('Still setting up. Retrying…', 'warn');
-        try {
-          device.configure().catch(e => log('configure retry: ' + errStr(e)));
-        } catch (e) {
-          log('configure retry threw: ' + errStr(e));
-        }
+    // Config streams one packet per HTTP request and the node is slow,
+    // so a long setup is normal. Restarting configure() throws away all
+    // progress, so only do it if the stream has actually stalled.
+    const stallWatch = setInterval(() => {
+      if (!device || configured) { clearInterval(stallWatch); return; }
+      const quiet = Date.now() - (lastPacketAt || 0);
+      if (lastPacketAt && quiet < 5000) return;      // still flowing
+      if (!lastPacketAt) return;                      // nothing yet, give it time
+      clearInterval(stallWatch);
+      log('config stalled for ' + Math.round(quiet / 1000) + 's — restarting');
+      setNote('Setup stalled. Retrying…', 'warn');
+      try {
+        device.configure().catch(e => log('configure retry: ' + errStr(e)));
+      } catch (e) {
+        log('configure retry threw: ' + errStr(e));
       }
-    }, 7000);
+    }, 2500);
 
     setTimeout(() => {
       if (device && !configured) {
@@ -880,7 +894,7 @@ async function openConnection(kind) {
           : 'Connected but setup never finished. Fully close the Meshtastic app, then retry.', 'err');
         markDropped();
       }
-    }, 22000);
+    }, 45000);
 
   } catch (e) {
     setLink('failed', 'down');
@@ -1037,7 +1051,7 @@ function handleReply(raw) {
 }
 
 // ---- offline support -------------------------------------------------
-const BUILD = 'v19';
+const BUILD = 'v20';
 log('build ' + BUILD, true);
 
 if ('serviceWorker' in navigator) {
@@ -1102,6 +1116,17 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
   grabWakeLock();
+
+// The node's first HTTP response took over three seconds — ARP, TCP
+// setup and a busy ESP32. Doing one throwaway request at launch means
+// that cost is already paid by the time the connect starts.
+(function preWarm() {
+  const ip = (nodeIpEl.value || '').trim();
+  if (!ip) return;
+  fetch('http://' + ip + '/', { mode: 'no-cors', cache: 'no-store' })
+    .then(() => log('pre-warmed the link to ' + ip))
+    .catch(() => log('pre-warm attempt made'));
+})();
   const ip = (nodeIpEl.value || '').trim();
   if (!device && !connecting && ip && TransportHTTP) {
     log('back in view — reconnecting');
