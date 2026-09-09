@@ -221,7 +221,7 @@
 // /api/v1/fromradio. There is no session, so nothing to re-establish
 // when Android kills the page — it just works from the first tap.
 // =====================================================================
-const BUILD = 'direct-v1';
+const BUILD = 'direct-v2';
 
 const FREQS = ["9.82kHz","32.8kHz","65.5kHz","83.1kHz","200kHz","SD-USA","512Hz","8.19kHz"];
 const OUT_MIN = 1, OUT_MAX = 5;
@@ -318,6 +318,13 @@ function encodeToRadio(text) {
   return new Uint8Array(lenDelim(1, encodeMeshPacket(text)));
 }
 
+// ToRadio { want_config_id = 3 }.
+// The node's phone API only starts queueing packets for a client once
+// it has announced itself this way. Without it fromradio stays empty.
+function encodeWantConfig(nonce) {
+  return new Uint8Array([...tag(3, 0), ...varint(nonce)]);
+}
+
 // =====================================================================
 // protobuf decoding — walk FromRadio far enough to find text payloads
 // =====================================================================
@@ -383,26 +390,39 @@ function extractText(buf) {
 // =====================================================================
 function base() { return 'http://' + ((nodeIpEl.value || '').trim() || '192.168.4.1'); }
 
-async function postToRadio(text) {
-  const body = encodeToRadio(text);
+async function putRaw(bytes) {
   const res = await fetch(base() + '/api/v1/toradio', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/x-protobuf' },
-    body,
+    body: bytes,
     cache: 'no-store'
   });
   if (!res.ok) throw new Error('node replied ' + res.status);
   return true;
 }
 
+async function postToRadio(text) {
+  return putRaw(encodeToRadio(text));
+}
+
+let announced = false;
+async function announce() {
+  const nonce = ((Math.random() * 0x7FFFFFFF) >>> 0) || 1;
+  await putRaw(encodeWantConfig(nonce));
+  announced = true;
+  log('announced as a client (nonce ' + nonce + ')', true);
+}
+
+let pollDiag = 0;
 async function pollOnce() {
-  const res = await fetch(base() + '/api/v1/fromradio?all=false', {
+  const res = await fetch(base() + '/api/v1/fromradio?all=true', {
     method: 'GET',
     headers: { 'Accept': 'application/x-protobuf' },
     cache: 'no-store'
   });
   if (!res.ok) throw new Error('poll ' + res.status);
   const buf = new Uint8Array(await res.arrayBuffer());
+  if (pollDiag > 0) { log('poll returned ' + buf.length + ' bytes'); pollDiag--; }
   if (!buf.length) return 0;
   const texts = extractText(buf);
   texts.forEach(t => {
@@ -422,18 +442,24 @@ let pollTimer = null;
 async function pollLoop() {
   clearTimeout(pollTimer);
   try {
+    if (!announced) {
+      await announce();
+      pollDiag = 6;              // log the next few polls while diagnosing
+    }
     // Drain everything queued, not just one packet.
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 25; i++) {
       const n = await pollOnce();
       if (!n) break;
     }
     if (!reachable) {
       reachable = true;
+      announced = false;         // re-announce after a dropout
       setLink('node reachable', 'up');
       log('node is reachable', true);
       render();
     }
   } catch (e) {
+    announced = false;
     if (reachable || linkText.textContent === 'checking…') {
       reachable = false;
       setLink('no node', 'down');
