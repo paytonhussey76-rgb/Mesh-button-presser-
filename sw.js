@@ -5,7 +5,7 @@
 // even after this worker updated. HTML now goes to the network first
 // and only falls back to cache when there is no signal.
 
-const CACHE = 'loc3-direct-v3';
+const CACHE = 'loc3-direct-v4';
 
 const LOCAL = [
   './',
@@ -52,6 +52,13 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // CRITICAL: never touch plain-HTTP requests. Those go to the Meshtastic
+  // node, and a service worker runs in a secure context so it cannot make
+  // them at all — intercepting here silently kills every call to the node.
+  // Returning without respondWith() lets the page make them directly.
+  if (url.protocol !== 'https:') return;
+
   const sameOrigin = url.origin === self.location.origin;
 
   // ---- HTML: always try the network, so updates land straight away ----
