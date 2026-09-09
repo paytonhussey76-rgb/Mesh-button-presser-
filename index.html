@@ -221,7 +221,7 @@
 // /api/v1/fromradio. There is no session, so nothing to re-establish
 // when Android kills the page — it just works from the first tap.
 // =====================================================================
-const BUILD = 'direct-v2';
+const BUILD = 'direct-v3';
 
 const FREQS = ["9.82kHz","32.8kHz","65.5kHz","83.1kHz","200kHz","SD-USA","512Hz","8.19kHz"];
 const OUT_MIN = 1, OUT_MAX = 5;
@@ -414,12 +414,40 @@ async function announce() {
 }
 
 let pollDiag = 0;
+
+// The node may or may not send CORS headers on this endpoint, and the
+// accepted URL form varies by firmware. Try the variants once, then
+// stick with whichever actually returns a readable body.
+const POLL_FORMS = [
+  { url: '/api/v1/fromradio?all=true',  opts: {} },
+  { url: '/api/v1/fromradio',           opts: {} },
+  { url: '/api/v1/fromradio?all=false', opts: {} },
+  { url: '/api/v1/fromradio?all=true',  opts: { headers: { 'Accept': 'application/x-protobuf' } } }
+];
+let pollForm = null;
+
+async function findPollForm() {
+  for (const form of POLL_FORMS) {
+    try {
+      const res = await fetch(base() + form.url,
+        Object.assign({ method: 'GET', cache: 'no-store' }, form.opts));
+      if (!res.ok) { log('poll form ' + form.url + ' -> HTTP ' + res.status); continue; }
+      await res.arrayBuffer();          // prove the body is readable
+      log('poll form works: ' + form.url, true);
+      pollForm = form;
+      return true;
+    } catch (e) {
+      log('poll form ' + form.url + ' -> ' + errStr(e).slice(0, 50));
+    }
+  }
+  log('no readable poll endpoint — replies cannot be received', true);
+  return false;
+}
+
 async function pollOnce() {
-  const res = await fetch(base() + '/api/v1/fromradio?all=true', {
-    method: 'GET',
-    headers: { 'Accept': 'application/x-protobuf' },
-    cache: 'no-store'
-  });
+  if (!pollForm) return 0;
+  const res = await fetch(base() + pollForm.url,
+    Object.assign({ method: 'GET', cache: 'no-store' }, pollForm.opts));
   if (!res.ok) throw new Error('poll ' + res.status);
   const buf = new Uint8Array(await res.arrayBuffer());
   if (pollDiag > 0) { log('poll returned ' + buf.length + ' bytes'); pollDiag--; }
@@ -446,6 +474,17 @@ async function pollLoop() {
       await announce();
       pollDiag = 6;              // log the next few polls while diagnosing
     }
+    if (!pollForm) {
+      const ok = await findPollForm();
+      if (!ok) {
+        // Sending still works; only confirmations are unavailable.
+        setLink('send only', 'down');
+        setNote('Commands are being sent, but this browser cannot read ' +
+                'replies from the node. See the log.', 'warn');
+        pollTimer = setTimeout(pollLoop, 15000);
+        return;
+      }
+    }
     // Drain everything queued, not just one packet.
     for (let i = 0; i < 25; i++) {
       const n = await pollOnce();
@@ -453,13 +492,11 @@ async function pollLoop() {
     }
     if (!reachable) {
       reachable = true;
-      announced = false;         // re-announce after a dropout
       setLink('node reachable', 'up');
       log('node is reachable', true);
       render();
     }
   } catch (e) {
-    announced = false;
     if (reachable || linkText.textContent === 'checking…') {
       reachable = false;
       setLink('no node', 'down');
