@@ -16,295 +16,125 @@
 
 <style>
   :root {
-    --body:      #0E0D0C;
-    --panel:     #1A1917;
-    --panel-hi:  #24221F;
-    --edge:      #333029;
-    --hivis:     #F5C518;
-    --key-red:   #C8382B;
-    --key-amber: #E8A317;
-    --key-slate: #6E8BA8;
-    --ink:       #F0EBE0;
-    --mute:      #7A736A;
-    --good:      #6FAE7F;
-    --bad:       #D2544A;
+    --body:#0E0D0C; --panel:#1A1917; --panel-hi:#24221F; --edge:#333029;
+    --hivis:#F5C518; --key-red:#C8382B; --key-amber:#E8A317; --key-slate:#6E8BA8;
+    --ink:#F0EBE0; --mute:#7A736A; --good:#6FAE7F; --bad:#D2544A;
   }
-
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { height: 100%; }
   body {
-    margin: 0 auto;
-    min-height: 100%;
-    max-width: 520px;
-    background: var(--body);
-    color: var(--ink);
-    font: 500 16px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0 auto; min-height: 100%; max-width: 520px;
+    background: var(--body); color: var(--ink);
+    font: 500 16px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif;
     padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: flex; flex-direction: column; gap: 12px;
   }
 
-  /* ---- status strip ---- */
-  .strip {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 13px;
-    color: var(--mute);
-  }
+  .strip { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; color:var(--mute); }
   .strip .name { color: var(--ink); font-weight: 650; letter-spacing: -0.01em; }
   .link { display: inline-flex; align-items: center; gap: 6px; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }
-  .link.up { color: var(--good); }
-  .link.up .dot { background: var(--good); }
-  .link.down { color: var(--bad); }
-  .link.down .dot { background: var(--bad); }
+  .dot { width:7px; height:7px; border-radius:50%; background: var(--mute); }
+  .link.up { color: var(--good); } .link.up .dot { background: var(--good); }
+  .link.down { color: var(--bad); } .link.down .dot { background: var(--bad); }
 
-  /* ---- readout: the hero ---- */
   .readout {
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-left: 3px solid var(--hivis);
-    border-radius: 4px;
-    padding: 16px 16px 14px;
+    background: var(--panel); border: 1px solid var(--edge);
+    border-left: 3px solid var(--hivis); border-radius: 4px; padding: 16px 16px 14px;
   }
   .freq {
-    display: block;
-    font-size: 42px;
-    font-weight: 680;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
+    display:block; font-size:42px; font-weight:680; letter-spacing:-0.03em;
+    line-height:1; font-variant-numeric: tabular-nums;
   }
   .freq.unknown { color: var(--mute); font-weight: 500; font-size: 26px; }
   .freq.stale { color: #B8AC96; }
   .stale-tag {
-    display: inline-block;
-    margin-left: 8px;
-    padding: 2px 7px;
-    border: 1px solid var(--edge);
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--mute);
-    vertical-align: middle;
+    display:inline-block; margin-left:8px; padding:2px 7px;
+    border:1px solid var(--edge); border-radius:3px; font-size:11px;
+    font-weight:600; color: var(--mute); vertical-align: middle;
   }
-  .state {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 14px;
-    color: var(--mute);
-  }
-  .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
-  .lamp {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #3A362F; border: 1px solid #4A453C;
-  }
+  .state { margin-top:10px; display:flex; align-items:center; gap:16px; font-size:14px; color:var(--mute); }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .lamp { width:9px; height:9px; border-radius:50%; background:#3A362F; border:1px solid #4A453C; }
   .pill.on { color: var(--ink); }
   .pill.on .lamp { background: var(--key-red); border-color: var(--key-red); }
-  .note {
-    margin-top: 10px;
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--mute);
-    min-height: 18px;
-  }
+  .note { margin-top:10px; font-size:13px; line-height:1.4; color:var(--mute); min-height:18px; }
   .note.warn { color: var(--key-amber); }
-  .note.err  { color: var(--bad); }
+  .note.err { color: var(--bad); }
 
-  /* ---- buttons ---- */
   button {
-    font: inherit;
-    font-weight: 600;
-    color: var(--ink);
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-radius: 4px;
-    min-height: 56px;
-    padding: 8px 10px;
+    font: inherit; font-weight: 600; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 4px; min-height: 56px; padding: 8px 10px;
     transition: background 90ms linear;
   }
   button:active:not(:disabled) { background: var(--panel-hi); }
   button:focus-visible { outline: 2px solid var(--hivis); outline-offset: 2px; }
   button:disabled { opacity: 0.28; }
 
-  .connect {
-    width: 100%;
-    min-height: 52px;
-    border-color: var(--hivis);
-    color: var(--hivis);
-  }
-
-  .power {
-    width: 100%;
-    min-height: 64px;
-    font-size: 18px;
-    border-color: var(--key-red);
-    color: #F0A99F;
-  }
-  .power.is-on { background: #2A1614; }
-
+  .power { width:100%; min-height:64px; font-size:18px; border-color: var(--key-red); color:#F0A99F; }
+  .power.is-on { background:#2A1614; }
   .mark {
-    display: block;
-    width: 100%;
-    margin-top: 6px;
-    min-height: 0;
-    padding: 4px;
-    background: none;
-    border: none;
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--mute);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    display:block; width:100%; margin-top:6px; min-height:0; padding:4px;
+    background:none; border:none; font-size:12.5px; font-weight:500;
+    color: var(--mute); text-decoration: underline; text-underline-offset: 3px;
   }
 
-  /* ---- sections ---- */
-  .block { display: flex; flex-direction: column; gap: 8px; }
-  .block h2 {
-    margin: 0;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--mute);
-  }
-  .block.locked { opacity: 0.34; pointer-events: none; }
+  .block { display:flex; flex-direction:column; gap:8px; }
+  .block h2 { margin:0; font-size:12.5px; font-weight:600; color: var(--mute); }
+  .block.locked { opacity:0.34; pointer-events:none; }
 
-  .freqgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .freqgrid button {
-    border-left: 3px solid var(--key-slate);
-    font-variant-numeric: tabular-nums;
-  }
-  .freqgrid button.active {
-    background: var(--panel-hi);
-    border-color: var(--hivis);
-    color: var(--hivis);
-  }
-  .next { width: 100%; border-left: 3px solid var(--key-slate); }
+  .freqgrid { display:grid; grid-template-columns: repeat(2,1fr); gap:8px; }
+  .freqgrid button { border-left:3px solid var(--key-slate); font-variant-numeric: tabular-nums; }
+  .freqgrid button.active { background: var(--panel-hi); border-color: var(--hivis); color: var(--hivis); }
+  .next { width:100%; border-left:3px solid var(--key-slate); }
 
-  /* ---- output row ---- */
-  .outrow {
-    display: grid;
-    grid-template-columns: 76px 1fr 76px;
-    gap: 8px;
-  }
-  .outrow button {
-    font-size: 24px;
-    border-color: var(--key-amber);
-    color: var(--key-amber);
-  }
+  .outrow { display:grid; grid-template-columns:76px 1fr 76px; gap:8px; }
+  .outrow button { font-size:24px; border-color: var(--key-amber); color: var(--key-amber); }
   .bars {
-    min-height: 64px;
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-radius: 4px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 7px;
-    padding: 12px 10px;
+    min-height:64px; background: var(--panel); border:1px solid var(--edge);
+    border-radius:4px; display:flex; align-items:flex-end; justify-content:center;
+    gap:7px; padding:12px 10px;
   }
-  .bars i {
-    display: block;
-    width: 13px;
-    background: #322E28;
-    border-radius: 1.5px;
-  }
+  .bars i { display:block; width:13px; background:#322E28; border-radius:1.5px; }
   .bars i.lit { background: var(--key-amber); }
-  .bars i:nth-child(1) { height: 22%; }
-  .bars i:nth-child(2) { height: 41%; }
-  .bars i:nth-child(3) { height: 60%; }
-  .bars i:nth-child(4) { height: 80%; }
-  .bars i:nth-child(5) { height: 100%; }
+  .bars i:nth-child(1){height:22%} .bars i:nth-child(2){height:41%}
+  .bars i:nth-child(3){height:60%} .bars i:nth-child(4){height:80%}
+  .bars i:nth-child(5){height:100%}
 
-  /* ---- connection row ---- */
-  .connrow { display: grid; grid-template-columns: 1fr 118px; gap: 8px; }
-  .connect.alt { border-color: var(--edge); color: var(--mute); }
-  .iprow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12.5px;
-    color: var(--mute);
-    margin-top: -4px;
-  }
+  .iprow { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--mute); }
   .iprow input {
-    flex: 1;
-    background: var(--panel);
-    border: 1px solid var(--edge);
-    border-radius: 4px;
-    color: var(--ink);
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-    padding: 8px 10px;
-    min-width: 0;
+    flex:1; min-width:0; background: var(--panel); border:1px solid var(--edge);
+    border-radius:4px; color: var(--ink); font: inherit;
+    font-variant-numeric: tabular-nums; padding:8px 10px;
   }
 
-  /* ---- calibration ---- */
-  .calrow {
-    display: grid;
-    grid-template-columns: 1fr 54px 54px 54px 62px;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 0;
-  }
-  .calrow + .calrow { border-top: 1px solid #232019; }
-  .calrow .who { font-size: 14px; font-weight: 600; }
-  .calrow .val {
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    font-size: 17px;
-    font-weight: 650;
-    color: var(--hivis);
-  }
-  .calrow button {
-    min-height: 42px;
-    padding: 0;
-    font-size: 18px;
-    font-weight: 600;
-  }
-  .calrow button.test { font-size: 13px; }
-  .calnote {
-    padding: 8px 0 2px;
-    font-size: 12.5px;
-    line-height: 1.45;
-    color: var(--mute);
-  }
-  .calfoot { display: flex; gap: 8px; padding-top: 8px; }
-  .calfoot button { flex: 1; min-height: 44px; font-size: 14px; }
+  .calrow { display:grid; grid-template-columns:1fr 54px 54px 54px 62px; align-items:center; gap:6px; padding:6px 0; }
+  .calrow + .calrow { border-top:1px solid #232019; }
+  .calrow .who { font-size:14px; font-weight:600; }
+  .calrow .val { text-align:center; font-variant-numeric:tabular-nums; font-size:17px; font-weight:650; color:var(--hivis); }
+  .calrow button { min-height:42px; padding:0; font-size:18px; }
+  .calrow button.test { font-size:13px; }
+  .calnote { padding:8px 0 2px; font-size:12.5px; line-height:1.45; color:var(--mute); }
+  .calfoot { display:flex; gap:8px; padding-top:8px; }
+  .calfoot button { flex:1; min-height:44px; font-size:14px; }
 
-  /* ---- log ---- */
-  details {
-    border: 1px solid var(--edge);
-    border-radius: 4px;
-    background: #0A0908;
-  }
-  summary { padding: 10px 12px; font-size: 13px; color: var(--mute); cursor: pointer; }
+  details { border:1px solid var(--edge); border-radius:4px; background:#0A0908; }
+  summary { padding:10px 12px; font-size:13px; color:var(--mute); cursor:pointer; }
   #log {
-    max-height: 190px;
-    overflow-y: auto;
-    padding: 0 12px 12px;
+    max-height:190px; overflow-y:auto; padding:0 12px 12px;
     font: 400 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: var(--mute);
-    white-space: pre-wrap;
-    word-break: break-word;
+    color: var(--mute); white-space: pre-wrap; word-break: break-word;
   }
   #log b { color: var(--ink); font-weight: 500; }
 
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
-  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 
 <div class="strip">
   <span class="name">Loc3-5Tx</span>
-  <span class="link" id="link"><span class="dot"></span><span id="linkText">not connected</span></span>
+  <span class="link" id="link"><span class="dot"></span><span id="linkText">checking…</span></span>
 </div>
 
 <div class="readout">
@@ -313,22 +143,13 @@
     <span class="pill" id="pwrPill"><span class="lamp"></span><span id="pwrText">off</span></span>
     <span id="outText">output 1</span>
   </div>
-  <div class="note" id="note">Loading radio library…</div>
-  <button class="mark" id="btnQuery" disabled>Check current frequency</button>
+  <div class="note" id="note">Ready.</div>
+  <button class="mark" id="btnQuery">Check current frequency</button>
 </div>
 
-<div class="connrow">
-  <button class="connect" id="btnConnect">Connect over WiFi</button>
-  <button class="connect alt" id="btnConnectBle">Bluetooth</button>
-</div>
-<div class="iprow">
-  <label for="nodeIp">Node address</label>
-  <input id="nodeIp" value="192.168.4.1" inputmode="decimal" spellcheck="false">
-</div>
-
-<div class="block" id="powerBlock">
-  <button class="power" id="btnPower" disabled>Turn transmitter on</button>
-  <button class="mark" id="btnMark" disabled>It&rsquo;s already on &mdash; don&rsquo;t send anything</button>
+<div class="block">
+  <button class="power" id="btnPower">Turn transmitter on</button>
+  <button class="mark" id="btnMark">It&rsquo;s already on &mdash; don&rsquo;t send anything</button>
 </div>
 
 <div class="block locked" id="freqBlock">
@@ -351,39 +172,20 @@
   <div style="padding:0 12px 12px">
     <div class="calnote">
       Degrees the horn travels onto each key. Raise a few at a time until
-      presses are reliable, then stop &mdash; past the point the key bottoms
-      out the servo is stalling. Saved on the C3, survives a reboot.
+      presses are reliable, then stop. Saved on the C3.
     </div>
-
-    <div class="calrow" data-key="P">
-      <span class="who">Power</span>
-      <button class="cal-dn">&minus;</button>
-      <span class="val">&mdash;</span>
-      <button class="cal-up">&plus;</button>
-      <button class="test">Test</button>
-    </div>
-    <div class="calrow" data-key="F">
-      <span class="who">Frequency</span>
-      <button class="cal-dn">&minus;</button>
-      <span class="val">&mdash;</span>
-      <button class="cal-up">&plus;</button>
-      <button class="test">Test</button>
-    </div>
-    <div class="calrow" data-key="U">
-      <span class="who">Output +</span>
-      <button class="cal-dn">&minus;</button>
-      <span class="val">&mdash;</span>
-      <button class="cal-up">&plus;</button>
-      <button class="test">Test</button>
-    </div>
-    <div class="calrow" data-key="D">
-      <span class="who">Output &minus;</span>
-      <button class="cal-dn">&minus;</button>
-      <span class="val">&mdash;</span>
-      <button class="cal-up">&plus;</button>
-      <button class="test">Test</button>
-    </div>
-
+    <div class="calrow" data-key="P"><span class="who">Power</span>
+      <button class="cal-dn">&minus;</button><span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button><button class="test">Test</button></div>
+    <div class="calrow" data-key="F"><span class="who">Frequency</span>
+      <button class="cal-dn">&minus;</button><span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button><button class="test">Test</button></div>
+    <div class="calrow" data-key="U"><span class="who">Output +</span>
+      <button class="cal-dn">&minus;</button><span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button><button class="test">Test</button></div>
+    <div class="calrow" data-key="D"><span class="who">Output &minus;</span>
+      <button class="cal-dn">&minus;</button><span class="val">&mdash;</span>
+      <button class="cal-up">&plus;</button><button class="test">Test</button></div>
     <div class="calfoot">
       <button id="calRead">Read from device</button>
       <button id="calReset">Reset to defaults</button>
@@ -392,663 +194,289 @@
 </details>
 
 <details>
-  <summary>Activity log</summary>
-  <div id="log">ready.</div>
+  <summary>Connection</summary>
+  <div style="padding:0 12px 12px">
+    <div class="iprow">
+      <label for="nodeIp">Node address</label>
+      <input id="nodeIp" value="192.168.4.1" inputmode="decimal" spellcheck="false">
+    </div>
+    <div class="calnote">
+      This build talks to the node's HTTP API directly. There is no pairing
+      or config download, so a command goes out the moment you tap it.
+    </div>
+  </div>
 </details>
 
-<script type="importmap">
-{
-  "imports": {
-    "https://esm.sh/node/util.mjs": "./util-shim.js"
-  }
-}
-</script>
+<details>
+  <summary>Activity log</summary>
+  <div id="log">starting…</div>
+</details>
 
-<script type="module">
-// ======================================================================
-// These must match the FREQS[] array in the C3 firmware, same order.
-// G1 is index 0.
-// ======================================================================
+<script>
+// =====================================================================
+// Loc3 remote — direct HTTP build.
+//
+// No meshtastic.js. Commands are hand-encoded protobuf posted straight
+// to the node's /api/v1/toradio, and replies come from polling
+// /api/v1/fromradio. There is no session, so nothing to re-establish
+// when Android kills the page — it just works from the first tap.
+// =====================================================================
+const BUILD = 'direct-v1';
+
 const FREQS = ["9.82kHz","32.8kHz","65.5kHz","83.1kHz","200kHz","SD-USA","512Hz","8.19kHz"];
-const OUT_MIN = 1;
-const OUT_MAX = 5;
+const OUT_MIN = 1, OUT_MAX = 5;
+const ANGLE_STEP = 2, ANGLE_MIN = 0, ANGLE_MAX = 75;
 
-const logEl    = document.getElementById('log');
-const linkEl   = document.getElementById('link');
-const linkText = document.getElementById('linkText');
-const freqVal  = document.getElementById('freqVal');
-const noteEl   = document.getElementById('note');
-const pwrPill  = document.getElementById('pwrPill');
-const pwrText  = document.getElementById('pwrText');
-const outText  = document.getElementById('outText');
-const barsEl   = document.getElementById('bars');
+const BROADCAST = 0xFFFFFFFF;
+const TEXT_MESSAGE_APP = 1;
+const CHANNEL_INDEX = 0;      // primary channel
+const HOP_LIMIT = 3;
 
-const btnConn    = document.getElementById('btnConnect');
-const btnConnBle = document.getElementById('btnConnectBle');
-const nodeIpEl   = document.getElementById('nodeIp');
-const btnPower = document.getElementById('btnPower');
-const btnMark  = document.getElementById('btnMark');
-const btnQuery = document.getElementById('btnQuery');
-const calRead  = document.getElementById('calRead');
-const calReset = document.getElementById('calReset');
-const btnNext  = document.getElementById('btnNext');
-const btnUp    = document.getElementById('btnUp');
-const btnDown  = document.getElementById('btnDown');
+const POLL_IDLE = 1200;       // ms between polls when nothing is pending
+const POLL_BUSY = 350;        // ms between polls while awaiting a reply
+const REPLY_TIMEOUT = 30000;
 
-const freqBlock = document.getElementById('freqBlock');
-const outBlock  = document.getElementById('outBlock');
-const freqGrid  = document.getElementById('freqGrid');
+// ---------- elements ----------
+const $ = id => document.getElementById(id);
+const logEl=$('log'), linkEl=$('link'), linkText=$('linkText');
+const freqVal=$('freqVal'), noteEl=$('note'), pwrPill=$('pwrPill');
+const pwrText=$('pwrText'), outText=$('outText'), barsEl=$('bars');
+const btnPower=$('btnPower'), btnMark=$('btnMark'), btnNext=$('btnNext');
+const btnUp=$('btnUp'), btnDown=$('btnDown'), btnQuery=$('btnQuery');
+const freqBlock=$('freqBlock'), outBlock=$('outBlock'), freqGrid=$('freqGrid');
+const nodeIpEl=$('nodeIp'), calRead=$('calRead'), calReset=$('calReset');
 
-let device       = null;
-let connected    = false;
-let powerOn      = false;
-let outLevel     = 1;
-let freqIndex    = null;
-let angles       = { P: null, F: null, U: null, D: null };
-const ANGLE_STEP = 2;
-const ANGLE_MIN  = 0;
-const ANGLE_MAX  = 75;
-let pending      = null;
-let pendingTimer = null;
-let readyDone    = false;
-let configured   = false;
-let connecting   = false;
-let activeTransport = null;
-let configPackets = 0;
-let lastPacketAt = 0;
-let haveChannel  = false;
-let haveNodeInfo = false;
-let earlyUnlock  = false;
-let stateConfirmed = false;   // false until the device tells us
-let busy         = false;
-let lastSent     = '';
-
-// Anything thrown inside a library callback can tear down the BLE
-// transport, so surface it in the log rather than losing it.
-window.addEventListener('error', ev => {
-  log('JS error: ' + (ev.message || 'unknown') +
-      (ev.filename ? ' @ ' + String(ev.filename).split('/').pop() + ':' + ev.lineno : ''));
-});
-let lastRejection = '';
-let rejectionCount = 0;
-window.addEventListener('unhandledrejection', ev => {
-  const msg = errStr(ev.reason);
-  if (msg === lastRejection) {
-    rejectionCount++;
-    if (rejectionCount % 5 !== 0) return;   // thin out repeats
-    log('unhandled promise: ' + msg + '  (x' + (rejectionCount + 1) + ')');
-    return;
-  }
-  lastRejection = msg;
-  rejectionCount = 0;
-  log('unhandled promise: ' + msg);
-});
-
-// Storage may be blocked depending on how the page is opened, so every
-// access is guarded and simply does nothing if unavailable.
-function remember(key, value) {
-  try { localStorage.setItem('loc3.' + key, String(value)); } catch (_) {}
-}
-function recall(key, fallback) {
-  try {
-    const v = localStorage.getItem('loc3.' + key);
-    return v === null ? fallback : v;
-  } catch (_) { return fallback; }
-}
-
-// Stage timing, so slow connects can be attributed rather than guessed.
-let t0 = 0;
-function stampStart() { t0 = performance.now(); }
-function stamp(label) {
-  const ms = Math.round(performance.now() - t0);
-  log('  +' + ms + 'ms  ' + label);
-}
-
-function errStr(e) {
-  if (!e) return 'unknown error';
-  if (typeof e === 'string') return e;
-  if (e.message) return e.message;
-  if (e.error)   return String(e.error);
-  try { return JSON.stringify(e); } catch (_) { return String(e); }
-}
+// ---------- state ----------
+let powerOn = false, outLevel = 1, freqIndex = null;
+let stateConfirmed = false, reachable = false, busy = false;
+let pending = null, pendingTimer = null, lastSent = '';
+let angles = { P:null, F:null, U:null, D:null };
 
 function log(msg, strong) {
-  const t = new Date().toLocaleTimeString([], { hour12: false });
+  const t = new Date().toLocaleTimeString([], { hour12:false });
   logEl.innerHTML += `\n${t}  ` + (strong ? `<b>${msg}</b>` : msg);
   logEl.scrollTop = logEl.scrollHeight;
 }
-function setLink(text, cls) {
-  linkText.textContent = text;
-  linkEl.className = 'link' + (cls ? ' ' + cls : '');
-}
-function setNote(text, kind) {
-  noteEl.textContent = text;
-  noteEl.className = 'note' + (kind ? ' ' + kind : '');
-}
+function setLink(t, c) { linkText.textContent = t; linkEl.className = 'link' + (c ? ' ' + c : ''); }
+function setNote(t, k) { noteEl.textContent = t; noteEl.className = 'note' + (k ? ' ' + k : ''); }
 
-FREQS.forEach((name, i) => {
-  const b = document.createElement('button');
-  b.textContent = name;
-  b.addEventListener('click', () => send('G' + (i + 1)));
-  freqGrid.appendChild(b);
-});
-const freqButtons = [...freqGrid.querySelectorAll('button')];
-
-function saveState() {
-  remember('freq',  freqIndex === null ? '' : freqIndex);
-  remember('power', powerOn ? '1' : '0');
-  remember('out',   outLevel);
+function remember(k, v) { try { localStorage.setItem('loc3.' + k, String(v)); } catch(_){} }
+function recall(k, d) { try { const v = localStorage.getItem('loc3.' + k); return v === null ? d : v; } catch(_) { return d; } }
+function errStr(e) {
+  if (!e) return 'unknown';
+  if (typeof e === 'string') return e;
+  if (e.message) return e.message;
+  try { return JSON.stringify(e); } catch(_) { return String(e); }
 }
 
-function render() {
-  if (freqIndex === null) {
-    freqVal.textContent = 'frequency unknown';
-    freqVal.className = 'freq unknown';
-  } else {
-    freqVal.textContent = FREQS[freqIndex];
-    freqVal.className = 'freq' + (stateConfirmed ? '' : ' stale');
-    if (!stateConfirmed) {
-      const tag = document.createElement('span');
-      tag.className = 'stale-tag';
-      tag.textContent = 'last known';
-      freqVal.appendChild(tag);
-    }
-  }
-  freqButtons.forEach((b, i) => b.classList.toggle('active', i === freqIndex));
-
-  pwrPill.className = 'pill' + (powerOn ? ' on' : '');
-  pwrText.textContent = powerOn ? 'on' : 'off';
-  btnPower.textContent = powerOn ? 'Turn transmitter off' : 'Turn transmitter on';
-  btnPower.classList.toggle('is-on', powerOn);
-  btnMark.textContent = powerOn
-    ? "It's actually off — don't send anything"
-    : "It's already on — don't send anything";
-
-  outText.textContent = 'output ' + outLevel;
-  [...barsEl.children].forEach((bar, i) => bar.classList.toggle('lit', i < outLevel));
-
-  // calibration rows
-  document.querySelectorAll('.calrow').forEach(row => {
-    const k = row.dataset.key;
-    const v = angles[k];
-    row.querySelector('.val').textContent = (v === null ? '—' : v);
-    row.querySelector('.cal-dn').disabled = !connected || busy || v === null || v <= ANGLE_MIN;
-    row.querySelector('.cal-up').disabled = !connected || busy || v === null || v >= ANGLE_MAX;
-    row.querySelector('.test').disabled   = !connected || busy;
-  });
-  calRead.disabled  = !connected || busy;
-  calReset.disabled = !connected || busy;
-
-  const live = connected && powerOn && !busy;
-  btnPower.disabled = !connected || busy;
-  btnMark.disabled  = !connected;
-  btnQuery.disabled = !connected || busy;
-  btnUp.disabled    = !live || outLevel >= OUT_MAX;
-  btnDown.disabled  = !live || outLevel <= OUT_MIN;
-  btnNext.disabled  = !live;
-  freqButtons.forEach(b => b.disabled = !live);
-  freqBlock.classList.toggle('locked', !(connected && powerOn));
-  outBlock.classList.toggle('locked', !(connected && powerOn));
+// =====================================================================
+// protobuf encoding — only the few field types this needs
+// =====================================================================
+function varint(n) {
+  const out = [];
+  n = n >>> 0;
+  while (n > 127) { out.push((n & 0x7f) | 0x80); n >>>= 7; }
+  out.push(n);
+  return out;
+}
+function tag(field, wire) { return varint((field << 3) | wire); }
+function fixed32(n) {
+  n = n >>> 0;
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+}
+function lenDelim(field, bytes) {
+  return [...tag(field, 2), ...varint(bytes.length), ...bytes];
 }
 
-// ---- library ---------------------------------------------------------
-let MeshDevice, TransportWebBluetooth, TransportHTTP;
-
-const CORE_URLS = [
-  'https://esm.sh/@meshtastic/core?bundle&target=es2022',
-  'https://esm.sh/@meshtastic/core',
-  'https://cdn.jsdelivr.net/npm/@meshtastic/core/+esm'
-];
-const TRANSPORT_URLS = [
-  'https://esm.sh/@meshtastic/transport-web-bluetooth?bundle&target=es2022',
-  'https://esm.sh/@meshtastic/transport-web-bluetooth',
-  'https://cdn.jsdelivr.net/npm/@meshtastic/transport-web-bluetooth/+esm'
-];
-const HTTP_URLS = [
-  'https://esm.sh/@meshtastic/transport-http?bundle&target=es2022',
-  'https://esm.sh/@meshtastic/transport-http',
-  'https://cdn.jsdelivr.net/npm/@meshtastic/transport-http/+esm'
-];
-
-async function tryImport(urls, exportName) {
-  for (const url of urls) {
-    try {
-      const mod = await import(url);
-      const found = mod[exportName] ?? mod.default?.[exportName];
-      if (found) { log('ok: ' + url, true); return found; }
-      log('loaded but no ' + exportName + ' in ' + url);
-    } catch (e) {
-      log('fail: ' + url);
-      log('   ' + String(e).slice(0, 120));
-    }
-  }
-  return null;
+// Data { portnum = 1 (varint), payload = 2 (bytes) }
+function encodeData(text) {
+  const payload = [...new TextEncoder().encode(text)];
+  return [
+    ...tag(1, 0), ...varint(TEXT_MESSAGE_APP),
+    ...lenDelim(2, payload)
+  ];
 }
 
-log('loading core…');
-MeshDevice = await tryImport(CORE_URLS, 'MeshDevice');
-log('loading wifi transport…');
-TransportHTTP = await tryImport(HTTP_URLS, 'TransportHTTP');
-log('loading bluetooth transport…');
-TransportWebBluetooth = await tryImport(TRANSPORT_URLS, 'TransportWebBluetooth');
-
-if (MeshDevice && (TransportHTTP || TransportWebBluetooth)) {
-  log('library ready', true);
-  setNote('Ready. Connect over WiFi, or fall back to Bluetooth.');
-  btnConn.disabled    = !TransportHTTP;
-  btnConnBle.disabled = !TransportWebBluetooth;
-} else {
-  log('no working source found for the radio library');
-  setNote('Radio library failed to load. Open the activity log for detail.', 'err');
-  btnConn.disabled = true;
-  btnConnBle.disabled = true;
+// MeshPacket { to = 2 (fixed32), channel = 3 (varint),
+//              decoded = 4 (msg), id = 6 (fixed32),
+//              hop_limit = 9 (varint), want_ack = 10 (bool) }
+function encodeMeshPacket(text) {
+  const data = encodeData(text);
+  const id = (Math.random() * 0xFFFFFFFF) >>> 0;
+  const out = [
+    ...tag(2, 5), ...fixed32(BROADCAST),
+    ...lenDelim(4, data),
+    ...tag(6, 5), ...fixed32(id),
+    ...tag(9, 0), ...varint(HOP_LIMIT)
+  ];
+  if (CHANNEL_INDEX) out.push(...tag(3, 0), ...varint(CHANNEL_INDEX));
+  return out;
 }
 
-// ---- connect ---------------------------------------------------------
-// The BLE link often reports a brief disconnect during setup and then
-// recovers a second later. Treat a drop as real only if nothing comes
-// back within DROP_GRACE, otherwise every connect looks like a failure.
-const DROP_GRACE = 4000;
-let dropTimer = null;
-
-// Every abandoned MeshDevice keeps polling GATT in the background, and
-// Web Bluetooth only allows one operation at a time. Without a real
-// teardown, each retry adds another competitor and the link collapses.
-async function teardown(reason) {
-  clearTimeout(dropTimer);
-  clearTimeout(pendingTimer);
-  dropTimer = null;
-  const old = device;
-  device = null;
-  activeTransport = null;
-  connected = false;
-  configured = false;
-  readyDone = false;
-  busy = false;
-  pending = null;
-  if (old) {
-    log('tearing down previous connection' + (reason ? ' (' + reason + ')' : ''));
-    try {
-      if (typeof old.disconnect === 'function') await old.disconnect();
-    } catch (e) {
-      log('   disconnect: ' + errStr(e));
-    }
-  }
-  render();
+// ToRadio { packet = 1 }
+function encodeToRadio(text) {
+  return new Uint8Array(lenDelim(1, encodeMeshPacket(text)));
 }
 
-function markReady() {
-  clearTimeout(dropTimer);
-  dropTimer = null;
-  clearInterval(window.__loc3Progress);
-  if (!device) return;          // nothing behind the UI, ignore
-  if (readyDone) return;
-  readyDone = true;
-  connected = true;
-  setLink('connected', 'up');
-  btnConn.textContent = 'Connected';
-  btnConn.disabled = true;
-  btnConnBle.disabled = true;
-  // Setup is done, so stop hammering the node. 700ms still picks up a
-  // reply within a second without polling flat out all shift.
-  if (activeTransport) {
-    try {
-      activeTransport.fetchInterval = 700;
-      log('poll interval eased to 700ms');
-    } catch (_) {}
-  }
-
-  clearInterval(window.__loc3Progress);
-  stamp('CONFIGURED — usable');
-  log('config took ' + configPackets + ' packets');
-  if (earlyUnlock) log('(was already usable before this)');
-
-  setNote('Connected. Checking which frequency the transmitter is on…');
-  log('ready', true);
-  render();
-
-  // No automatic query. The C3 holds the real state, and the readout
-  // already shows what it was last time, so waiting on a round trip
-  // before you can press anything is wasted time.
-  if (freqIndex !== null && !stateConfirmed) {
-    setNote('Showing last known state. Commands work now; tap "Check current frequency" to confirm.');
-  } else if (freqIndex === null) {
-    setNote('Connected. Tap "Check current frequency" if you want to confirm the state.');
-  }
-
-  // Press depths are only needed if you open the calibration panel.
-  setTimeout(() => {
-    if (device && configured && !busy && angles.F === null) send('A?');
-  }, 5000);
+// =====================================================================
+// protobuf decoding — walk FromRadio far enough to find text payloads
+// =====================================================================
+function readVarint(buf, pos) {
+  let result = 0, shift = 0, b;
+  do {
+    if (pos >= buf.length) return [0, buf.length];
+    b = buf[pos++];
+    result |= (b & 0x7f) << shift;
+    shift += 7;
+  } while (b & 0x80);
+  return [result >>> 0, pos];
 }
 
-function noteFlap() {
-  if (dropTimer) return;
-  log('link dropped — waiting to see if it recovers');
-  setLink('unstable', 'down');
-  dropTimer = setTimeout(() => {
-    dropTimer = null;
-    markDropped();
-  }, DROP_GRACE);
-}
-
-function markDropped() {
-  teardown('link lost');
-  setLink('disconnected', 'down');
-  btnConn.disabled = !TransportHTTP;
-  btnConnBle.disabled = !TransportWebBluetooth;
-  btnConn.textContent = 'Connect over WiFi';
-  setNote('Link dropped. Tap connect to try again.', 'err');
-}
-
-async function openConnection(kind) {
-  if (!MeshDevice) { log('no library, cannot connect'); return; }
-  if (connecting) { log('connection attempt already running'); return; }
-  if (device) { log('already connected'); return; }
-
-  connecting = true;
-  btnConn.disabled = true;
-  btnConnBle.disabled = true;
-
-  // Only wait for the radio stack to settle if there was actually a
-  // previous connection to tear down.
-  const old_device_existed = !!device;
-
-  try {
-    // Clear out anything left from a previous attempt, then give the
-    // radio stack a moment before opening a new connection.
-    await teardown('starting fresh');
-    await new Promise(r => setTimeout(r, old_device_existed ? 800 : 150));
-
-    readyDone = false;
-    configured = false;
-    configPackets = 0;
-    haveChannel = false;
-    haveNodeInfo = false;
-    earlyUnlock = false;
-    clearTimeout(dropTimer);
-    dropTimer = null;
-
-    let transport;
-    if (kind === 'wifi') {
-      const ip = (nodeIpEl.value || '').trim() || '192.168.4.1';
-      setLink('connecting…');
-      setNote('Reaching the node at ' + ip + '…');
-      log('opening http transport to ' + ip);
-      remember('ip', ip);
-      stampStart();
-
-      // Probe the node directly first. This separates "the node is slow
-      // to answer" from "the library is slow to set up".
-      try {
-        const probe = await fetch('http://' + ip + '/hotspot-detect.html',
-                                  { method: 'GET', cache: 'no-store', mode: 'no-cors' });
-        stamp('node answered a plain http request');
-      } catch (e) {
-        stamp('probe failed: ' + errStr(e).slice(0, 60));
-      }
-      transport = await TransportHTTP.create(ip, false);   // false = no TLS
-      stamp('transport created');
-      // HTTP has no push, so the transport polls. The config handshake
-      // needs many round trips, and at a slow interval that is most of
-      // the connect time. Poll hard now, back off once configured.
-      try {
-        transport.fetchInterval = 45;
-        log('poll interval 45ms for setup');
-      } catch (e) {
-        log('could not set poll interval: ' + errStr(e));
-      }
+// Returns a map of field number -> {wire, value} for one message.
+function walkFields(buf, start, end, cb) {
+  let pos = start;
+  while (pos < end) {
+    let key;
+    [key, pos] = readVarint(buf, pos);
+    if (pos > end) return;
+    const field = key >>> 3, wire = key & 7;
+    if (wire === 0) {
+      let v; [v, pos] = readVarint(buf, pos);
+      cb(field, wire, v, 0, 0);
+    } else if (wire === 5) {
+      cb(field, wire, 0, pos, pos + 4);
+      pos += 4;
+    } else if (wire === 1) {
+      pos += 8;
+    } else if (wire === 2) {
+      let len; [len, pos] = readVarint(buf, pos);
+      cb(field, wire, len, pos, pos + len);
+      pos += len;
     } else {
-      setLink('pairing…');
-      setNote('Pick your node from the list. The Meshtastic app must be closed.');
-      log('requesting bluetooth device…');
-      transport = await TransportWebBluetooth.create();
+      return;   // groups, not used
     }
-
-    activeTransport = transport;
-    device = new MeshDevice(transport);
-    stamp('device object built');
-
-    // Diagnostic: list what the library actually exposes, and confirm
-    // the poll interval took. Different transports surface packets on
-    // different events.
-    try {
-      const evNames = Object.keys(device.events || {});
-      log('events available: ' + (evNames.length ? evNames.join(', ') : 'none found'));
-      if (kind === 'wifi') {
-        log('fetchInterval now: ' + transport.fetchInterval);
-      }
-    } catch (e) {
-      log('could not inspect events: ' + errStr(e));
-    }
-
-    // Catch-all: subscribe to every packet-ish event so nothing arriving
-    // goes unnoticed while we work out which one carries text.
-    // Sending only needs our own node identity and the channel. Those
-    // arrive early in the config stream; the node database is the bulk
-    // and arrives last. Unlock as soon as the essentials land rather
-    // than waiting for the whole download.
-    function tryEarlyUnlock(what) {
-      log('got ' + what);
-      if (!haveChannel || !haveNodeInfo) return;
-      if (earlyUnlock || configured) return;
-      earlyUnlock = true;
-      stamp('essentials received — unlocking early');
-      markReady();
-    }
-
-    try {
-      const ch = device.events && device.events.onChannelPacket;
-      if (ch && ch.subscribe) ch.subscribe(() => {
-        if (!haveChannel) { haveChannel = true; tryEarlyUnlock('channel'); }
-      });
-    } catch (_) {}
-
-    try {
-      const ni = device.events && device.events.onMyNodeInfo;
-      if (ni && ni.subscribe) ni.subscribe(() => {
-        if (!haveNodeInfo) { haveNodeInfo = true; tryEarlyUnlock('my node info'); }
-      });
-    } catch (_) {}
-
-    // Count the config stream rather than printing every packet — it was
-    // roughly seventy lines of noise per connect.
-    try {
-      const fr = device.events && device.events.onFromRadio;
-      if (fr && typeof fr.subscribe === 'function') {
-        fr.subscribe(() => { configPackets++; lastPacketAt = Date.now(); });
-      }
-    } catch (_) {}
-
-    ['onMeshPacket', 'onRoutingPacket'].forEach(name => {
-      try {
-        const ev = device.events && device.events[name];
-        if (ev && typeof ev.subscribe === 'function') {
-          ev.subscribe(pkt => {
-            try {
-              let hint = '';
-              if (pkt && typeof pkt === 'object') {
-                if (pkt.data !== undefined) hint = ' data=' + String(pkt.data).slice(0, 40);
-                else if (pkt.payload !== undefined) hint = ' payload=' + String(pkt.payload).slice(0, 40);
-              }
-              log('[' + name + ']' + hint);
-            } catch (_) { log('[' + name + ']'); }
-          });
-        }
-      } catch (_) { /* event not present on this version */ }
-    });
-
-    device.events.onMessagePacket.subscribe(p => {
-      // Everything here is defensive: an exception thrown back into the
-      // library's emitter can drop the connection.
-      try {
-        const text = String(p?.data ?? p?.payload ?? '').trim();
-        if (text && !text.includes('>')) {
-          if (text !== lastSent) log('rx (ignored): ' + text);
-          return;
-        }
-        log('rx: ' + text);
-        setTimeout(() => {
-          try { handleReply(text); }
-          catch (e) { log('reply handler error: ' + errStr(e)); }
-        }, 0);
-      } catch (e) {
-        log('packet handler error: ' + errStr(e));
-      }
-    });
-
-    // 1 restarting, 2 disconnected, 3 connecting, 4 reconnecting,
-    // 5 connected, 6 configuring, 7 configured
-    if (device.events.onDeviceStatus) {
-      device.events.onDeviceStatus.subscribe(st => {
-        try {
-          const names = {1:'restarting',2:'disconnected',3:'connecting',
-                         4:'reconnecting',5:'connected',6:'configuring',7:'configured'};
-          log('status ' + st + ' (' + (names[st] || '?') + ')');
-          setTimeout(() => {
-            try {
-              // 7 = configured, and that is the only point at which the
-              // node will accept a packet.
-              if (st === 7) { configured = true; markReady(); }
-              if (st === 2 && configured) noteFlap();
-              if (st === 2 && !configured) log('   handshake blip, ignoring');
-            } catch (e) { log('status handler error: ' + errStr(e)); }
-          }, 0);
-        } catch (e) {
-          log('status subscribe error: ' + errStr(e));
-        }
-      });
-    }
-
-    stamp('calling configure');
-    device.configure().catch(e => log('configure: ' + errStr(e)));
-
-    clearInterval(window.__loc3Progress);
-    window.__loc3Progress = setInterval(() => {
-      if (configured || !device) { clearInterval(window.__loc3Progress); return; }
-      setNote('Loading node config… ' + configPackets + ' of about 70 packets.');
-    }, 900);
-    connecting = false;
-
-    // Config streams one packet per HTTP request and the node is slow,
-    // so a long setup is normal. Restarting configure() throws away all
-    // progress, so only do it if the stream has actually stalled.
-    const stallWatch = setInterval(() => {
-      if (!device || configured) { clearInterval(stallWatch); return; }
-      const quiet = Date.now() - (lastPacketAt || 0);
-      if (lastPacketAt && quiet < 5000) return;      // still flowing
-      if (!lastPacketAt) return;                      // nothing yet, give it time
-      clearInterval(stallWatch);
-      log('config stalled for ' + Math.round(quiet / 1000) + 's — restarting');
-      setNote('Setup stalled. Retrying…', 'warn');
-      try {
-        device.configure().catch(e => log('configure retry: ' + errStr(e)));
-      } catch (e) {
-        log('configure retry threw: ' + errStr(e));
-      }
-    }, 2500);
-
-    setTimeout(() => {
-      if (device && !configured) {
-        log('config never completed — giving up');
-        setNote(kind === 'wifi'
-          ? 'Reached the node but setup never finished. Check the address and that you are on its WiFi network.'
-          : 'Connected but setup never finished. Fully close the Meshtastic app, then retry.', 'err');
-        markDropped();
-      }
-    }, 45000);
-
-  } catch (e) {
-    setLink('failed', 'down');
-    const msg = errStr(e);
-    log('connect failed: ' + msg);
-    setNote(kind === 'wifi'
-      ? 'Could not reach the node. Are you on its WiFi? Chrome may also be blocking the insecure request — allow it in site settings.'
-      : 'Could not connect over Bluetooth. Close the Meshtastic app and retry.', 'err');
-    connecting = false;
-    await teardown('connect failed');
-    btnConn.disabled = !TransportHTTP;
-    btnConnBle.disabled = !TransportWebBluetooth;
   }
 }
 
-btnConn.addEventListener('click',    () => openConnection('wifi'));
-btnConnBle.addEventListener('click', () => openConnection('ble'));
+// FromRadio.packet = 2 -> MeshPacket.decoded = 4 -> Data.payload = 2
+function extractText(buf) {
+  const found = [];
+  walkFields(buf, 0, buf.length, (f, wire, v, s, e) => {
+    if (f !== 2 || wire !== 2) return;                    // FromRadio.packet
+    walkFields(buf, s, e, (pf, pw, pv, ps, pe) => {
+      if (pf !== 4 || pw !== 2) return;                   // MeshPacket.decoded
+      let portnum = -1, payloadStart = -1, payloadEnd = -1;
+      walkFields(buf, ps, pe, (df, dw, dv, ds, de) => {
+        if (df === 1 && dw === 0) portnum = dv;           // Data.portnum
+        if (df === 2 && dw === 2) { payloadStart = ds; payloadEnd = de; }
+      });
+      if (portnum === TEXT_MESSAGE_APP && payloadStart >= 0) {
+        found.push(new TextDecoder().decode(buf.slice(payloadStart, payloadEnd)));
+      }
+    });
+  });
+  return found;
+}
 
-// ---- sending ---------------------------------------------------------
+// =====================================================================
+// transport
+// =====================================================================
+function base() { return 'http://' + ((nodeIpEl.value || '').trim() || '192.168.4.1'); }
+
+async function postToRadio(text) {
+  const body = encodeToRadio(text);
+  const res = await fetch(base() + '/api/v1/toradio', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/x-protobuf' },
+    body,
+    cache: 'no-store'
+  });
+  if (!res.ok) throw new Error('node replied ' + res.status);
+  return true;
+}
+
+async function pollOnce() {
+  const res = await fetch(base() + '/api/v1/fromradio?all=false', {
+    method: 'GET',
+    headers: { 'Accept': 'application/x-protobuf' },
+    cache: 'no-store'
+  });
+  if (!res.ok) throw new Error('poll ' + res.status);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (!buf.length) return 0;
+  const texts = extractText(buf);
+  texts.forEach(t => {
+    const s = String(t).trim();
+    if (!s) return;
+    if (!s.includes('>')) {
+      if (s !== lastSent) log('rx (ignored): ' + s);
+      return;
+    }
+    log('rx: ' + s);
+    handleReply(s);
+  });
+  return buf.length;
+}
+
+let pollTimer = null;
+async function pollLoop() {
+  clearTimeout(pollTimer);
+  try {
+    // Drain everything queued, not just one packet.
+    for (let i = 0; i < 8; i++) {
+      const n = await pollOnce();
+      if (!n) break;
+    }
+    if (!reachable) {
+      reachable = true;
+      setLink('node reachable', 'up');
+      log('node is reachable', true);
+      render();
+    }
+  } catch (e) {
+    if (reachable || linkText.textContent === 'checking…') {
+      reachable = false;
+      setLink('no node', 'down');
+      log('poll failed: ' + errStr(e).slice(0, 80));
+      render();
+    }
+  }
+  pollTimer = setTimeout(pollLoop, busy ? POLL_BUSY : POLL_IDLE);
+}
+
+// =====================================================================
+// commands
+// =====================================================================
 async function send(cmd) {
-  if (!device) { log('not connected'); return; }
-  if (busy) { log('ignored ' + cmd + ' — still waiting on ' + pending); return; }
-
-  busy = true;
-  pending = cmd;
-  lastSent = cmd;
+  if (busy) { log('ignored ' + cmd + ' — waiting on ' + pending); return; }
+  busy = true; pending = cmd; lastSent = cmd;
   render();
 
   log('tx: ' + cmd, true);
-  setNote('Sent ' + cmd + '. Waiting for the transmitter to confirm…');
+  setNote('Sent ' + cmd + '. Waiting for the transmitter…');
 
   clearTimeout(pendingTimer);
   pendingTimer = setTimeout(() => {
-    if (pending) {
-      setNote('No reply to ' + pending + '. Out of range, or the box lost power.', 'warn');
-      setLink('no reply', 'down');
-      log('timeout waiting for ' + pending);
-      pending = null;
-      busy = false;
-      render();
-    }
-  }, 30000);
+    if (!pending) return;
+    setNote('No reply to ' + pending + '. Out of range, or the box lost power.', 'warn');
+    log('timeout waiting for ' + pending);
+    pending = null; busy = false; render();
+  }, REPLY_TIMEOUT);
 
   try {
-    await device.sendText(cmd);
+    await postToRadio(cmd);
+    pollLoop();          // poll hard straight away
   } catch (e) {
-    // The library rejects this promise on its own internal ack timeout,
-    // which fires well before a LoRa round trip completes. The
-    // transmitter's '>' reply is the real confirmation, so log the
-    // rejection and let the reply timeout decide whether it truly failed.
-    log('sendText rejected (' + errStr(e) + ') — waiting for the reply anyway');
+    const msg = errStr(e);
+    log('send failed: ' + msg);
+    setNote('Could not reach the node: ' + msg.slice(0, 60), 'err');
+    clearTimeout(pendingTimer);
+    pending = null; busy = false;
+    reachable = false; setLink('no node', 'down');
+    render();
   }
 }
 
-btnQuery.addEventListener('click', () => send('Q'));
-
-// ---- calibration ----
-const TEST_CMD = { P: 'P', F: 'F1', U: 'U1', D: 'D1' };
-
-document.querySelectorAll('.calrow').forEach(row => {
-  const k = row.dataset.key;
-  row.querySelector('.cal-up').addEventListener('click', () => nudgeAngle(k, +ANGLE_STEP));
-  row.querySelector('.cal-dn').addEventListener('click', () => nudgeAngle(k, -ANGLE_STEP));
-  row.querySelector('.test').addEventListener('click', () => send(TEST_CMD[k]));
-});
-
-function nudgeAngle(key, delta) {
-  if (angles[key] === null) { log('read the angles from the device first'); return; }
-  const next = Math.max(ANGLE_MIN, Math.min(ANGLE_MAX, angles[key] + delta));
-  if (next === angles[key]) return;
-  send('A' + key + next);
-}
-
-calRead.addEventListener('click',  () => send('A?'));
-calReset.addEventListener('click', () => send('AR'));
-btnPower.addEventListener('click', () => send('P'));
-btnNext.addEventListener('click',  () => send('F1'));
-btnUp.addEventListener('click',    () => { if (outLevel < OUT_MAX) send('U1'); });
-btnDown.addEventListener('click',  () => { if (outLevel > OUT_MIN) send('D1'); });
-
-// The transmitter can't report whether it is powered, so this corrects
-// the assumption without pressing anything on the keypad.
-btnMark.addEventListener('click', () => {
-  powerOn = !powerOn;
-  setNote(powerOn ? 'Marked as on. Nothing was sent.'
-                  : 'Marked as off. Nothing was sent.');
-  log('manual state: power ' + (powerOn ? 'on' : 'off'));
-  saveState();
-  render();
-});
-
-// ---- replies ---------------------------------------------------------
 function handleReply(raw) {
   let s = String(raw).trim();
   const colon = s.indexOf(':');
@@ -1058,34 +486,22 @@ function handleReply(raw) {
 
   const answered = pending;
   clearTimeout(pendingTimer);
-  pending = null;
-  busy = false;
-  stateConfirmed = true;
-  setLink('connected', 'up');
+  pending = null; busy = false; stateConfirmed = true;
+  setLink('node reachable', 'up');
 
   if (/^ANG\b/i.test(s)) {
-    // >ANG P30 F38 D30 U30
-    let found = 0;
-    s.replace(/([PFDU])\s*(-?\d+)/gi, (_m, key, num) => {
-      angles[key.toUpperCase()] = parseInt(num, 10);
-      found++;
-      return '';
-    });
-    setNote(found
-      ? 'Press depths: power ' + angles.P + '°, freq ' + angles.F +
-        '°, out+ ' + angles.U + '°, out− ' + angles.D + '°.'
-      : 'Could not read press depths.', found ? null : 'warn');
+    let n = 0;
+    s.replace(/([PFDU])\s*(-?\d+)/gi, (_m, k, v) => { angles[k.toUpperCase()] = parseInt(v,10); n++; return ''; });
+    setNote(n ? 'Press depths: power ' + angles.P + '°, freq ' + angles.F +
+                '°, out+ ' + angles.U + '°, out− ' + angles.D + '°.'
+              : 'Could not read press depths.', n ? null : 'warn');
 
   } else if (/^(NOW|SYNC)\s+/i.test(s)) {
     const name = s.replace(/^(NOW|SYNC)\s+/i, '').trim();
     const idx = FREQS.findIndex(f => f.toLowerCase() === name.toLowerCase());
     freqIndex = idx >= 0 ? idx : null;
-    if (idx >= 0) {
-      setNote('Now on ' + FREQS[idx] + '.');
-    } else {
-      log('device reported an unlisted frequency: ' + name);
-      setNote('Transmitter reported ' + name + ', which is not in the list.', 'warn');
-    }
+    setNote(idx >= 0 ? 'Now on ' + FREQS[idx] + '.'
+                     : 'Transmitter reported ' + name + ', not in the list.', idx >= 0 ? null : 'warn');
 
   } else if (/^OK\s+out\+/i.test(s)) {
     outLevel = Math.min(OUT_MAX, outLevel + 1);
@@ -1097,15 +513,11 @@ function handleReply(raw) {
 
   } else if (/^OK\s+power/i.test(s)) {
     powerOn = !powerOn;
-    if (powerOn) {
-      setNote('Transmitter powered on.');
-    } else {
-      freqIndex = null;
-      setNote('Transmitter powered off.');
-    }
+    if (!powerOn) freqIndex = null;
+    setNote(powerOn ? 'Transmitter powered on.' : 'Transmitter powered off.');
 
   } else if (/^ERR/i.test(s)) {
-    setNote('Transmitter rejected ' + (answered || 'the command') + ': ' + s.slice(3).trim(), 'err');
+    setNote('Rejected ' + (answered || 'command') + ': ' + s.slice(3).trim(), 'err');
 
   } else {
     setNote(s);
@@ -1115,130 +527,147 @@ function handleReply(raw) {
   render();
 }
 
-// ---- offline support -------------------------------------------------
-const BUILD = 'v22';
-log('build ' + BUILD, true);
+// =====================================================================
+// ui
+// =====================================================================
+FREQS.forEach((name, i) => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.addEventListener('click', () => send('G' + (i + 1)));
+  freqGrid.appendChild(b);
+});
+const freqButtons = [...freqGrid.querySelectorAll('button')];
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => {
-        log('offline support installed');
-        // Check for a newer worker on every launch, and take it without
-        // making the user clear site data by hand.
-        reg.update().catch(() => {});
-        reg.addEventListener('updatefound', () => {
-          const fresh = reg.installing;
-          if (!fresh) return;
-          fresh.addEventListener('statechange', () => {
-            if (fresh.state === 'installed' && navigator.serviceWorker.controller) {
-              log('a newer version is ready — reloading');
-              fresh.postMessage('skipWaiting');
-              setTimeout(() => location.reload(), 400);
-            }
-          });
-        });
-      })
-      .catch(e => log('service worker failed: ' + String(e).slice(0, 80)));
+function saveState() {
+  remember('freq', freqIndex === null ? '' : freqIndex);
+  remember('power', powerOn ? '1' : '0');
+  remember('out', outLevel);
+}
 
-    let reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloaded) return;
-      reloaded = true;
-      location.reload();
-    });
+function render() {
+  if (freqIndex === null) {
+    freqVal.textContent = 'frequency unknown';
+    freqVal.className = 'freq unknown';
+  } else {
+    freqVal.textContent = FREQS[freqIndex];
+    freqVal.className = 'freq' + (stateConfirmed ? '' : ' stale');
+    if (!stateConfirmed) {
+      const tagEl = document.createElement('span');
+      tagEl.className = 'stale-tag';
+      tagEl.textContent = 'last known';
+      freqVal.appendChild(tagEl);
+    }
+  }
+  freqButtons.forEach((b, i) => b.classList.toggle('active', i === freqIndex));
+
+  pwrPill.className = 'pill' + (powerOn ? ' on' : '');
+  pwrText.textContent = powerOn ? 'on' : 'off';
+  btnPower.textContent = powerOn ? 'Turn transmitter off' : 'Turn transmitter on';
+  btnPower.classList.toggle('is-on', powerOn);
+  btnMark.textContent = powerOn ? "It's actually off — don't send anything"
+                                : "It's already on — don't send anything";
+
+  outText.textContent = 'output ' + outLevel;
+  [...barsEl.children].forEach((bar, i) => bar.classList.toggle('lit', i < outLevel));
+
+  const live = powerOn && !busy;
+  btnPower.disabled = busy;
+  btnQuery.disabled = busy;
+  btnUp.disabled = !live || outLevel >= OUT_MAX;
+  btnDown.disabled = !live || outLevel <= OUT_MIN;
+  btnNext.disabled = !live;
+  freqButtons.forEach(b => b.disabled = !live);
+  freqBlock.classList.toggle('locked', !powerOn);
+  outBlock.classList.toggle('locked', !powerOn);
+
+  document.querySelectorAll('.calrow').forEach(row => {
+    const k = row.dataset.key, v = angles[k];
+    row.querySelector('.val').textContent = (v === null ? '—' : v);
+    row.querySelector('.cal-dn').disabled = busy || v === null || v <= ANGLE_MIN;
+    row.querySelector('.cal-up').disabled = busy || v === null || v >= ANGLE_MAX;
+    row.querySelector('.test').disabled = busy;
   });
+  calRead.disabled = busy;
+  calReset.disabled = busy;
 }
 
-// Android suspends backgrounded web apps, so hold a wake lock while the
-// app is on screen. This keeps the session alive during a job rather
-// than dropping it every time the screen dims.
-let wakeLock = null;
+btnPower.addEventListener('click', () => send('P'));
+btnNext.addEventListener('click', () => send('F1'));
+btnUp.addEventListener('click', () => { if (outLevel < OUT_MAX) send('U1'); });
+btnDown.addEventListener('click', () => { if (outLevel > OUT_MIN) send('D1'); });
+btnQuery.addEventListener('click', () => send('Q'));
 
-async function grabWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  if (wakeLock) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
-    log('screen wake lock held');
-  } catch (e) {
-    log('wake lock unavailable: ' + errStr(e));
-  }
-}
-
-function dropWakeLock() {
-  if (!wakeLock) return;
-  try { wakeLock.release(); } catch (_) {}
-  wakeLock = null;
-}
-
-// Coming back to the app should feel like it never left. Retake the wake
-// lock and reopen the connection if Android tore it down while hidden.
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') {
-    dropWakeLock();
-    return;
-  }
-  grabWakeLock();
-
-// The node's first HTTP response took over three seconds — ARP, TCP
-// setup and a busy ESP32. Doing one throwaway request at launch means
-// that cost is already paid by the time the connect starts.
-(function preWarm() {
-  const ip = (nodeIpEl.value || '').trim();
-  if (!ip) return;
-  fetch('http://' + ip + '/', { mode: 'no-cors', cache: 'no-store' })
-    .then(() => log('pre-warmed the link to ' + ip))
-    .catch(() => log('pre-warm attempt made'));
-})();
-  const ip = (nodeIpEl.value || '').trim();
-  if (!device && !connecting && ip && TransportHTTP) {
-    log('back in view — reconnecting');
-    setNote('Reconnecting…');
-    openConnection('wifi');
-  }
+btnMark.addEventListener('click', () => {
+  powerOn = !powerOn;
+  setNote(powerOn ? 'Marked as on. Nothing was sent.' : 'Marked as off. Nothing was sent.');
+  saveState(); render();
 });
 
-// Restore the last node address, and reconnect on its own if we have
-// one. A failed attempt just falls back to the buttons.
-// Restore what we knew last time so the readout is useful immediately.
-const savedFreq = recall('freq', '');
-if (savedFreq !== '') {
-  const idx = parseInt(savedFreq, 10);
-  if (!isNaN(idx) && idx >= 0 && idx < FREQS.length) {
-    freqIndex = idx;
-    log('last known frequency: ' + FREQS[idx]);
-  }
+const TEST_CMD = { P:'P', F:'F1', U:'U1', D:'D1' };
+document.querySelectorAll('.calrow').forEach(row => {
+  const k = row.dataset.key;
+  row.querySelector('.cal-up').addEventListener('click', () => nudge(k, +ANGLE_STEP));
+  row.querySelector('.cal-dn').addEventListener('click', () => nudge(k, -ANGLE_STEP));
+  row.querySelector('.test').addEventListener('click', () => send(TEST_CMD[k]));
+});
+function nudge(key, delta) {
+  if (angles[key] === null) { log('read the angles from the device first'); return; }
+  const next = Math.max(ANGLE_MIN, Math.min(ANGLE_MAX, angles[key] + delta));
+  if (next === angles[key]) return;
+  send('A' + key + next);
 }
-powerOn  = recall('power', '0') === '1';
-outLevel = Math.max(OUT_MIN, Math.min(OUT_MAX, parseInt(recall('out', '1'), 10) || 1));
-stateConfirmed = false;
-
-const savedIp = recall('ip', '');
-if (savedIp) {
-  nodeIpEl.value = savedIp;
-  log('remembered node address ' + savedIp);
-}
+calRead.addEventListener('click', () => send('A?'));
+calReset.addEventListener('click', () => send('AR'));
 
 nodeIpEl.addEventListener('change', () => {
   const v = nodeIpEl.value.trim();
-  if (v) { remember('ip', v); log('saved node address ' + v); }
+  if (v) { remember('ip', v); log('saved node address ' + v); reachable = false; pollLoop(); }
 });
 
-if (recall('auto', '1') === '1' && savedIp && MeshDevice && TransportHTTP) {
-  setTimeout(() => {
-    if (!device && !connecting) {
-      log('auto-connecting to ' + savedIp);
-      setNote('Reconnecting to ' + savedIp + '…');
-      openConnection('wifi');
-    }
-  }, 200);
+// ---------- restore ----------
+log('build ' + BUILD, true);
+
+const savedIp = recall('ip', '');
+if (savedIp) nodeIpEl.value = savedIp;
+
+const savedFreq = recall('freq', '');
+if (savedFreq !== '') {
+  const idx = parseInt(savedFreq, 10);
+  if (!isNaN(idx) && idx >= 0 && idx < FREQS.length) freqIndex = idx;
+}
+powerOn = recall('power', '0') === '1';
+outLevel = Math.max(OUT_MIN, Math.min(OUT_MAX, parseInt(recall('out','1'), 10) || 1));
+stateConfirmed = false;
+
+if (freqIndex !== null) {
+  setNote('Showing last known state. Commands work immediately.');
+} else {
+  setNote('Ready. Tap a command, or check the current frequency.');
 }
 
+// ---------- wake lock ----------
+let wakeLock = null;
+async function grabWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { grabWakeLock(); pollLoop(); }
+  else { try { wakeLock && wakeLock.release(); } catch(_){} wakeLock = null; clearTimeout(pollTimer); }
+});
 grabWakeLock();
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
 render();
+pollLoop();
 </script>
 
 </body>
