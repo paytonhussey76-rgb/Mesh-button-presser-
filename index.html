@@ -144,7 +144,7 @@
     <span id="outText">output 1</span>
   </div>
   <div class="note" id="note">Ready.</div>
-  <button class="mark" id="btnQuery">Check current frequency</button>
+  <button class="mark" id="btnQuery">Refresh status from transmitter</button>
 </div>
 
 <div class="block">
@@ -193,6 +193,25 @@
   </div>
 </details>
 
+<details id="syncPanel">
+  <summary>Sync &mdash; correct without pressing</summary>
+  <div style="padding:0 12px 12px">
+    <div class="calnote">
+      Use this when the transmitter has been changed by hand. Nothing is
+      pressed; it only corrects what the box believes.
+    </div>
+    <h2 style="margin:10px 0 6px;font-size:12.5px;color:var(--mute)">Frequency it is actually on</h2>
+    <div class="freqgrid" id="syncGrid"></div>
+    <h2 style="margin:14px 0 6px;font-size:12.5px;color:var(--mute)">Power</h2>
+    <div class="outrow" style="grid-template-columns:1fr 1fr">
+      <button id="syncOn">Mark on</button>
+      <button id="syncOff">Mark off</button>
+    </div>
+    <h2 style="margin:14px 0 6px;font-size:12.5px;color:var(--mute)">Output level it shows</h2>
+    <div class="outrow" style="grid-template-columns:repeat(5,1fr)" id="syncOut"></div>
+  </div>
+</details>
+
 <details>
   <summary>Connection</summary>
   <div style="padding:0 12px 12px">
@@ -221,7 +240,7 @@
 // /api/v1/fromradio. There is no session, so nothing to re-establish
 // when Android kills the page — it just works from the first tap.
 // =====================================================================
-const BUILD = 'direct-v4';
+const BUILD = 'direct-v5';
 
 const FREQS = ["9.82kHz","32.8kHz","65.5kHz","83.1kHz","200kHz","SD-USA","512Hz","8.19kHz"];
 const OUT_MIN = 1, OUT_MAX = 5;
@@ -552,7 +571,22 @@ function handleReply(raw) {
   pending = null; busy = false; stateConfirmed = true;
   setLink('node reachable', 'up');
 
-  if (/^ANG\b/i.test(s)) {
+  if (/^ST\b/i.test(s)) {
+    // >ST <slot 1-based> <power 0|1> <out 1-5> <name>
+    const m = s.match(/^ST\s+(\d+)\s+([01])\s+(\d+)/i);
+    if (m) {
+      const slot = parseInt(m[1], 10) - 1;
+      freqIndex = (slot >= 0 && slot < FREQS.length) ? slot : null;
+      powerOn   = m[2] === '1';
+      outLevel  = Math.max(OUT_MIN, Math.min(OUT_MAX, parseInt(m[3], 10)));
+      setNote(powerOn
+        ? 'On, ' + (freqIndex !== null ? FREQS[freqIndex] : '?') + ', output ' + outLevel + '.'
+        : 'Transmitter is off.');
+    } else {
+      log('could not parse status: ' + s);
+    }
+
+  } else if (/^ANG\b/i.test(s)) {
     let n = 0;
     s.replace(/([PFDU])\s*(-?\d+)/gi, (_m, k, v) => { angles[k.toUpperCase()] = parseInt(v,10); n++; return ''; });
     setNote(n ? 'Press depths: power ' + angles.P + '°, freq ' + angles.F +
@@ -560,24 +594,11 @@ function handleReply(raw) {
               : 'Could not read press depths.', n ? null : 'warn');
 
   } else if (/^(NOW|SYNC)\s+/i.test(s)) {
+    // older firmware
     const name = s.replace(/^(NOW|SYNC)\s+/i, '').trim();
     const idx = FREQS.findIndex(f => f.toLowerCase() === name.toLowerCase());
     freqIndex = idx >= 0 ? idx : null;
-    setNote(idx >= 0 ? 'Now on ' + FREQS[idx] + '.'
-                     : 'Transmitter reported ' + name + ', not in the list.', idx >= 0 ? null : 'warn');
-
-  } else if (/^OK\s+out\+/i.test(s)) {
-    outLevel = Math.min(OUT_MAX, outLevel + 1);
-    setNote('Output raised to ' + outLevel + '.');
-
-  } else if (/^OK\s+out-/i.test(s)) {
-    outLevel = Math.max(OUT_MIN, outLevel - 1);
-    setNote('Output lowered to ' + outLevel + '.');
-
-  } else if (/^OK\s+power/i.test(s)) {
-    powerOn = !powerOn;
-    if (!powerOn) freqIndex = null;
-    setNote(powerOn ? 'Transmitter powered on.' : 'Transmitter powered off.');
+    setNote(idx >= 0 ? 'Now on ' + FREQS[idx] + '.' : 'Reported ' + name + '.', idx >= 0 ? null : 'warn');
 
   } else if (/^ERR/i.test(s)) {
     setNote('Rejected ' + (answered || 'command') + ': ' + s.slice(3).trim(), 'err');
@@ -600,6 +621,25 @@ FREQS.forEach((name, i) => {
   freqGrid.appendChild(b);
 });
 const freqButtons = [...freqGrid.querySelectorAll('button')];
+
+// Sync controls — these send Z/W/Y, which change the box's idea of the
+// state without touching the keypad.
+const syncGrid = document.getElementById('syncGrid');
+FREQS.forEach((name, i) => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.addEventListener('click', () => send('Z' + (i + 1)));
+  syncGrid.appendChild(b);
+});
+const syncOut = document.getElementById('syncOut');
+for (let lvl = OUT_MIN; lvl <= OUT_MAX; lvl++) {
+  const b = document.createElement('button');
+  b.textContent = lvl;
+  b.addEventListener('click', () => send('Y' + lvl));
+  syncOut.appendChild(b);
+}
+document.getElementById('syncOn').addEventListener('click', () => send('W1'));
+document.getElementById('syncOff').addEventListener('click', () => send('W0'));
 
 function saveState() {
   remember('freq', freqIndex === null ? '' : freqIndex);
@@ -652,19 +692,22 @@ function render() {
   });
   calRead.disabled = busy;
   calReset.disabled = busy;
+
+  // Sync is always available — it is how you fix a wrong power state.
+  [...syncGrid.children, ...syncOut.children,
+   document.getElementById('syncOn'), document.getElementById('syncOff')]
+    .forEach(b => { if (b) b.disabled = busy; });
+  [...syncGrid.children].forEach((b, i) => b.classList.toggle('active', i === freqIndex));
 }
 
 btnPower.addEventListener('click', () => send('P'));
 btnNext.addEventListener('click', () => send('F1'));
 btnUp.addEventListener('click', () => { if (outLevel < OUT_MAX) send('U1'); });
 btnDown.addEventListener('click', () => { if (outLevel > OUT_MIN) send('D1'); });
-btnQuery.addEventListener('click', () => send('Q'));
+btnQuery.addEventListener('click', () => send('S'));
 
-btnMark.addEventListener('click', () => {
-  powerOn = !powerOn;
-  setNote(powerOn ? 'Marked as on. Nothing was sent.' : 'Marked as off. Nothing was sent.');
-  saveState(); render();
-});
+// Corrects the box's belief rather than only the app's, so both agree.
+btnMark.addEventListener('click', () => send(powerOn ? 'W0' : 'W1'));
 
 const TEST_CMD = { P:'P', F:'F1', U:'U1', D:'D1' };
 document.querySelectorAll('.calrow').forEach(row => {

@@ -5,7 +5,7 @@
 // even after this worker updated. HTML now goes to the network first
 // and only falls back to cache when there is no signal.
 
-const CACHE = 'loc3-direct-v4';
+const CACHE = 'loc3-direct-v5';
 
 const LOCAL = [
   './',
